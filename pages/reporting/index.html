@@ -1,0 +1,179 @@
+<?php
+// pages/reporting/index.php
+session_start();
+
+// Inclusions standard (ajustez les chemins si nécessaire)
+require_once('../../fonctions/database.php');
+require_once('../../templates/header.php');
+require_once('../../templates/navigation.php');
+
+$titre = 'Tableau de bord des Rapports Financiers';
+?>
+
+<div class="main-content-wrapper">
+    <div class="container-fluid px-3 px-md-4">
+        <div class="row">
+            <div class="col-12">
+                <h2 class="page-title text-primary">📊 <?= htmlspecialchars($titre) ?></h2>
+                <p class="lead">Sélectionnez le rapport financier que vous souhaitez consulter ou exporter.</p>
+                
+                <hr>
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-file-earmark-bar-graph me-2"></i> Rapports Standards</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            
+                            <div class="col-sm-6 col-md-4 col-lg-3">
+                                <div class="report-card p-3 border rounded text-center bg-light">
+                                    <h6 class="text-success">Bilan</h6>
+                                    <p class="text-muted small">Situation financière à une date donnée.</p>
+                                    <a href="balance.php" class="btn btn-success btn-sm w-100"><i class="bi bi-file-spreadsheet"></i> Consulter</a>
+                                </div>
+                            </div>
+                            
+                            <div class="col-sm-6 col-md-4 col-lg-3">
+                                <div class="report-card p-3 border rounded text-center bg-light">
+                                    <h6 class="text-danger">Compte de Résultat (P&L)</h6>
+                                    <p class="text-muted small">Performance sur une période donnée.</p>
+                                    <a href="profit_loss.php" class="btn btn-danger btn-sm w-100"><i class="bi bi-graph-up-arrow"></i> Consulter</a>
+                                </div>
+                            </div>
+
+                            <div class="col-sm-6 col-md-4 col-lg-3">
+                                <div class="report-card p-3 border rounded text-center bg-light">
+                                    <h6 class="text-info">Flux de Trésorerie</h6>
+                                    <p class="text-muted small">Mouvements d'encaisse sur la période.</p>
+                                    <a href="cash_flow_statement.php" class="btn btn-info btn-sm w-100"><i class="bi bi-cash-stack"></i> Consulter</a>
+                                </div>
+                            </div>
+                            
+                            <div class="col-sm-6 col-md-4 col-lg-3">
+                                <div class="report-card p-3 border rounded text-center bg-light">
+                                    <h6 class="text-secondary">Balance Générale</h6>
+                                    <p class="text-muted small">Synthèse des soldes de tous les comptes.</p>
+                                    <a href="balance_generale.php" class="btn btn-secondary btn-sm w-100"><i class="bi bi-journal-check"></i> Consulter</a>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="bi bi-book me-2"></i> Grands Livres et Journaux</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            
+                            <div class="col-sm-6 col-md-4 col-lg-3">
+                                <div class="report-card p-3 border rounded text-center bg-light">
+                                    <h6 class="text-warning">Journal Général</h6>
+                                    <p class="text-muted small">Liste chronologique de toutes les écritures.</p>
+                                    <a href="journal_general.php" class="btn btn-warning btn-sm w-100"><i class="bi bi-card-list"></i> Consulter</a>
+                                </div>
+                            </div>
+
+                            <div class="col-sm-6 col-md-4 col-lg-3">
+                                <div class="report-card p-3 border rounded text-center bg-light">
+                                    <h6 class="text-dark">Grand Livre</h6>
+                                    <p class="text-muted small">Détail des mouvements par compte.</p>
+                                    <a href="ledger_accounts.php" class="btn btn-dark btn-sm w-100"><i class="bi bi-archive"></i> Consulter</a>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-download me-2"></i> Exportations et Fiscalité</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+
+                            <div class="col-sm-6 col-md-4 col-lg-3">
+                                <div class="report-card p-3 border rounded text-center bg-light">
+                                    <h6 class="text-info">Liasse Fiscale</h6>
+                                    <p class="text-muted small">Génération du document pour l'administration.</p>
+                                    <a href="liasse_fiscale.php" class="btn btn-info btn-sm w-100"><i class="bi bi-file-text"></i> Préparer</a>
+                                </div>
+                            </div>
+                            
+                            <div class="col-sm-6 col-md-4 col-lg-3">
+                                <div class="report-card p-3 border rounded text-center bg-light">
+                                    <h6 class="text-primary">Exportation de Données</h6>
+                                    <p class="text-muted small">Exporter les données comptables (CSV/Excel).</p>
+                                    <a href="export_reports.php" class="btn btn-primary btn-sm w-100"><i class="bi bi-file-earmark-arrow-down"></i> Exporter</a>
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Correction de base pour assurer la réactivité et l'alignement */
+    .container-fluid {
+        max-width: 1300px; 
+        margin: 0 auto;
+        padding-top: 20px;
+    }
+
+    .page-title {
+        border-bottom: 3px solid #007bff;
+        padding-bottom: 10px;
+        margin-bottom: 25px;
+        font-weight: 700;
+    }
+
+    /* Styles pour les cartes de rapport */
+    .report-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        min-height: 150px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .report-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .report-card h6 {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Assurez-vous que l'icône Bootstrap est chargée */
+    @import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css");
+    
+    .card-header i {
+        font-size: 1.2rem;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .report-card {
+            min-height: 130px;
+        }
+        .page-title {
+            font-size: 1.5rem;
+        }
+    }
+    
+</style>
+
+<?php
+require_once('../../templates/footer.php');
+?>
