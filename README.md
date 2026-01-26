@@ -1,7 +1,15 @@
-<<<<<<< HEAD
-# bailcompta360
-BailCompta360 est une application web de gestion comptable et budgétaire . Elle intègre des modules complets pour la saisie d'écritures, la gestion des budgets, des emprunts, des factures et des utilisateurs, avec un espace d'administration sécurisé et des fonctions d'export/reporting. 
-=======
 # pressing_manager
-Application de gestion commerciale
->>>>>>> 773973be0c649554e0e2804fb3baceb069d2110d
+**Application de gestion commerciale pour pressing.**
+
+Cette application web permet de gérer l'activité complète d'un pressing avec une sécurité renforcée.
+
+### ⚠️ Fonctionnalités de sécurité incluses :
+* **Honeypot (Pot de Miel) 🍯** : Protection invisible contre les robots spammeurs sur le formulaire de connexion.
+* **Authentification Hybride** : Gestion des sessions et du Rate Limiting via **Redis** (haute performance) avec fallback automatique sur **MySQL**.
+* **Protection CSRF** : Sécurisation des formulaires contre les attaques inter-sites.
+* **Gestion des Rôles** : Redirection dynamique selon le profil (Admin, Caissier, Réceptionniste, etc.).
+
+### Pré-requis :
+* PHP 8.x
+* MySQL / MariaDB
+* Serveur Redis (optionnel, mais recommandé pour la performance)
