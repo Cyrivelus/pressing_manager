@@ -50,6 +50,7 @@ require_once  '../../templates/navigation.php';
     .auto-refresh-indicator { font-size: 0.8rem; color: #28a745; font-weight: 600; }
 </style>
 
+<br><br><br>
 <div class="container-fluid py-5">
     <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
         <div>

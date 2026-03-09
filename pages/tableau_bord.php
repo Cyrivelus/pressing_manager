@@ -1,291 +1,376 @@
 <?php
-// pages/dashboard.php (ancien tableau_bord.php pour pressing)
+// pages/dashboard.php - Tableau de Bord Personnalisé par Rôle
+// -----------------------------------------------------------
 
-// -----------------------------------------------------------
 // 1. Initialisation et Configuration
-// -----------------------------------------------------------
 header('Content-Type: text/html; charset=utf-8');
 ini_set('default_charset', 'UTF-8');
 mb_internal_encoding('UTF-8');
 session_start();
 
-// -----------------------------------------------------------
-// 2. Inclusions des Fichiers Nécessaires
-// -----------------------------------------------------------
+// 2. Vérification de l'authentification
+if (!isset($_SESSION['utilisateur_id'])) {
+    header("Location: ../index.php");
+    exit();
+}
+
+// 3. Récupération du rôle utilisateur
+$user_role = mb_strtolower(trim($_SESSION['role'] ?? ''), 'UTF-8');
+$user_name = $_SESSION['nom_complet'] ?? 'Utilisateur';
+$user_agence = $_SESSION['code_agence'] ?? 'Non défini';
+
+// 4. Inclusions des Fichiers Nécessaires
 require_once '../fonctions/database.php';
 require_once '../fonctions/gestion_utilisateurs.php';
 
-// -----------------------------------------------------------
-// 3. Vérification de l'authentification
-// -----------------------------------------------------------
-if (!isset($_SESSION['utilisateur_id'])) {
-    header('Location: ../../index.php');
-    exit;
-}
+// 5. Configuration par Rôle
+$role_config = [
+    // Administration
+    'admin' => [
+        'title' => 'Tableau de Bord Administrateur',
+        'icon' => 'fa-cogs',
+        'kpis' => ['revenue', 'tickets', 'clients', 'expenses', 'stock', 'employees'],
+        'charts' => ['revenue_by_category', 'tickets_by_status', 'clients_by_month', 'expenses', 'payment_methods', 'stock'],
+        'quick_actions' => ['new_ticket', 'manage_users', 'reports', 'settings', 'stock', 'clients']
+    ],
+    'directeur' => [
+        'title' => 'Tableau de Bord Direction',
+        'icon' => 'fa-chart-line',
+        'kpis' => ['revenue', 'profit', 'tickets', 'clients', 'expenses', 'stock_value'],
+        'charts' => ['revenue_by_category', 'tickets_trend', 'clients_growth', 'expenses_analysis', 'payment_methods', 'stock_value'],
+        'quick_actions' => ['financial_reports', 'performance', 'settings', 'analytics', 'stock', 'users']
+    ],
+    'patron' => [
+        'title' => 'Tableau de Bord Propriétaire',
+        'icon' => 'fa-crown',
+        'kpis' => ['revenue', 'profit_margin', 'tickets', 'clients', 'expenses', 'employee_performance'],
+        'charts' => ['revenue_by_category', 'tickets_trend', 'clients_growth', 'expenses_analysis', 'profit_analysis', 'stock_value'],
+        'quick_actions' => ['financial_reports', 'performance', 'settings', 'analytics', 'stock', 'users']
+    ],
+    
+    // Réception
+    'receptionniste' => [
+        'title' => 'Tableau de Bord Réception',
+        'icon' => 'fa-concierge-bell',
+        'kpis' => ['tickets_today', 'pending_tickets', 'ready_tickets', 'new_clients', 'revenue_today', 'average_ticket'],
+        'charts' => ['tickets_by_status', 'tickets_by_day', 'services_popularity', 'clients_by_hour'],
+        'quick_actions' => ['new_ticket', 'pending_tickets', 'ready_tickets', 'new_client', 'quick_search', 'ticket_list']
+    ],
+    'réceptionniste' => [
+        'title' => 'Tableau de Bord Réception',
+        'icon' => 'fa-concierge-bell',
+        'kpis' => ['tickets_today', 'pending_tickets', 'ready_tickets', 'new_clients', 'revenue_today', 'average_ticket'],
+        'charts' => ['tickets_by_status', 'tickets_by_day', 'services_popularity', 'clients_by_hour'],
+        'quick_actions' => ['new_ticket', 'pending_tickets', 'ready_tickets', 'new_client', 'quick_search', 'ticket_list']
+    ],
+    'reception_hotel' => [
+        'title' => 'Tableau de Bord Réception Hôtel',
+        'icon' => 'fa-hotel',
+        'kpis' => ['tickets_today', 'pending_tickets', 'ready_tickets', 'room_occupancy', 'revenue_today', 'guest_satisfaction'],
+        'charts' => ['tickets_by_status', 'room_status', 'service_requests', 'guest_arrivals'],
+        'quick_actions' => ['new_ticket', 'check_in', 'room_management', 'service_requests', 'guest_list', 'housekeeping']
+    ],
+    
+    // Caisse
+    'caissier' => [
+        'title' => 'Tableau de Bord Caisse',
+        'icon' => 'fa-cash-register',
+        'kpis' => ['revenue_today', 'transactions_today', 'average_transaction', 'pending_payments', 'cash_in_hand', 'card_transactions'],
+        'charts' => ['payment_methods', 'revenue_by_hour', 'transaction_types', 'daily_trend'],
+        'quick_actions' => ['new_sale', 'view_transactions', 'cash_close', 'payment_reconciliation', 'quick_payment', 'refunds']
+    ],
+    'caissière' => [
+        'title' => 'Tableau de Bord Caisse',
+        'icon' => 'fa-cash-register',
+        'kpis' => ['revenue_today', 'transactions_today', 'average_transaction', 'pending_payments', 'cash_in_hand', 'card_transactions'],
+        'charts' => ['payment_methods', 'revenue_by_hour', 'transaction_types', 'daily_trend'],
+        'quick_actions' => ['new_sale', 'view_transactions', 'cash_close', 'payment_reconciliation', 'quick_payment', 'refunds']
+    ],
+    'caissier_boutique' => [
+        'title' => 'Tableau de Bord Caisse Boutique',
+        'icon' => 'fa-shopping-cart',
+        'kpis' => ['revenue_today', 'sales_today', 'average_sale', 'best_selling', 'inventory_value', 'customer_count'],
+        'charts' => ['sales_by_category', 'payment_methods', 'hourly_sales', 'top_products'],
+        'quick_actions' => ['new_sale', 'inventory_check', 'customer_service', 'sales_report', 'product_search', 'discounts']
+    ],
+    
+    // Gestion
+    'gestionnaire_stock' => [
+        'title' => 'Tableau de Bord Gestion Stock',
+        'icon' => 'fa-boxes',
+        'kpis' => ['low_stock_count', 'total_products', 'stock_value', 'recent_orders', 'expiring_products', 'turnover_rate'],
+        'charts' => ['stock_levels', 'category_distribution', 'reorder_alerts', 'stock_movement'],
+        'quick_actions' => ['inventory_check', 'new_order', 'stock_adjustment', 'supplier_management', 'reports', 'categories']
+    ],
+    'gestion_hotel' => [
+        'title' => 'Tableau de Bord Gestion Hôtel',
+        'icon' => 'fa-building',
+        'kpis' => ['room_occupancy', 'revenue_today', 'bookings_today', 'check_ins', 'check_outs', 'guest_satisfaction'],
+        'charts' => ['room_status', 'revenue_by_room', 'booking_trend', 'guest_demographics'],
+        'quick_actions' => ['room_management', 'new_booking', 'guest_services', 'housekeeping', 'reports', 'settings']
+    ],
+    'gestion_commerce' => [
+        'title' => 'Tableau de Bord Gestion Commerce',
+        'icon' => 'fa-store',
+        'kpis' => ['revenue_today', 'sales_today', 'profit_margin', 'customer_count', 'inventory_value', 'employee_performance'],
+        'charts' => ['sales_by_category', 'revenue_trend', 'customer_acquisition', 'profit_analysis'],
+        'quick_actions' => ['sales_dashboard', 'inventory', 'staff_management', 'customer_insights', 'financial_reports', 'marketing']
+    ],
+    
+    // Service
+    'employe_pressing' => [
+        'title' => 'Tableau de Bord Employé Pressing',
+        'icon' => 'fa-tshirt',
+        'kpis' => ['tickets_to_process', 'completed_today', 'average_time', 'quality_score', 'machine_utilization', 'pending_quality_check'],
+        'charts' => ['workload_distribution', 'completion_rate', 'service_types', 'efficiency_trend'],
+        'quick_actions' => ['process_tickets', 'quality_check', 'machine_status', 'work_report', 'supplies_check', 'maintenance']
+    ],
+    'service_chambre' => [
+        'title' => 'Tableau de Bord Service Chambre',
+        'icon' => 'fa-bed',
+        'kpis' => ['rooms_to_clean', 'rooms_cleaned', 'cleaning_time', 'supplies_used', 'guest_requests', 'inspection_score'],
+        'charts' => ['room_status', 'cleaning_schedule', 'request_types', 'productivity'],
+        'quick_actions' => ['room_cleaning', 'supply_request', 'maintenance_report', 'guest_services', 'inventory_check', 'schedule']
+    ],
+    
+    // Commercial
+    'vendeur_boutique' => [
+        'title' => 'Tableau de Bord Vendeur',
+        'icon' => 'fa-user-tie',
+        'kpis' => ['sales_today', 'commission', 'conversion_rate', 'customer_interactions', 'average_sale', 'target_progress'],
+        'charts' => ['sales_performance', 'product_preferences', 'customer_segments', 'hourly_sales'],
+        'quick_actions' => ['new_sale', 'customer_profile', 'product_catalog', 'sales_target', 'commission_report', 'client_followup']
+    ]
+];
 
-// -----------------------------------------------------------
-// 4. Définition des Variables et Initialisation des Données
-// -----------------------------------------------------------
-$titre = 'Tableau de Bord Pressing';
+// Configuration par défaut si rôle non trouvé
+$current_config = $role_config[$user_role] ?? [
+    'title' => 'Tableau de Bord',
+    'icon' => 'fa-tachometer-alt',
+    'kpis' => ['tickets_today', 'pending_tickets', 'ready_tickets', 'revenue_today'],
+    'charts' => ['tickets_by_status', 'tickets_by_day'],
+    'quick_actions' => ['new_ticket', 'ticket_list', 'clients', 'settings']
+];
+
+// 6. Variables globales
+$titre = $current_config['title'];
 $current_page = basename(__FILE__);
-$current_agence_id = $_SESSION['agence_id'] ?? 1; // ID de l'agence de l'utilisateur
+$current_agence_id = $_SESSION['agence_id'] ?? 1;
 
-// Initialize KPIs with default zero values
-$kpis = [
-    'total_tickets' => 0,
-    'total_tickets_today' => 0,
-    'total_clients' => 0,
-    'total_revenue_today' => 0,
-    'total_tickets_pending' => 0,
-    'total_tickets_ready' => 0,
-    'low_stock_count' => 0,
-    'total_expenses' => 0,
-];
+// 7. Initialisation des données
+$kpis = [];
+$chart_data = [];
+$db_error = null;
 
-// Initialize chart data structures
-$chart_data = [
-    'tickets_by_status' => ['labels' => [], 'data' => []],
-    'tickets_by_day' => ['labels' => [], 'data' => []],
-    'services_popularity' => ['labels' => [], 'data' => []],
-    'revenue_by_category' => ['labels' => [], 'data' => []],
-    'clients_by_month' => ['labels' => [], 'data' => []],
-    'stock_alerts' => ['labels' => [], 'data' => []],
-    'payment_methods' => ['labels' => [], 'data' => []],
-    'expenses_by_category' => ['labels' => [], 'data' => []],
-];
-
-// -----------------------------------------------------------
-// 5. Récupération des Données du Tableau de Bord (KPIs et Graphiques)
-// -----------------------------------------------------------
+// 8. Récupération des données selon le rôle
 if ($pdo instanceof PDO) {
     try {
-        // KPIS: Total des tickets
-        $stmt = $pdo->prepare("SELECT COUNT(id_ticket) as total FROM tickets WHERE id_agence = :agence_id");
-        $stmt->execute([':agence_id' => $current_agence_id]);
-        $res = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($res) {
-            $kpis['total_tickets'] = (int)$res['total'];
-        }
-
-        // KPIS: Tickets du jour
+        // Données communes à tous les rôles
         $today = date('Y-m-d');
+        $currentMonth = date('Y-m');
+        
+        // Tickets du jour (commun)
         $stmt = $pdo->prepare("SELECT COUNT(id_ticket) as total FROM tickets 
                                WHERE id_agence = :agence_id AND DATE(date_depot) = :today");
         $stmt->execute([':agence_id' => $current_agence_id, ':today' => $today]);
         $res = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($res) {
-            $kpis['total_tickets_today'] = (int)$res['total'];
-        }
-
-        // KPIS: Total clients
-        $stmt = $pdo->prepare("SELECT COUNT(id_client) as total FROM clients 
-                               WHERE id_agence = :agence_id AND est_actif = TRUE");
-        $stmt->execute([':agence_id' => $current_agence_id]);
-        $res = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($res) {
-            $kpis['total_clients'] = (int)$res['total'];
-        }
-
-        // KPIS: Chiffre d'affaires du jour
+        $kpis['tickets_today'] = $res ? (int)$res['total'] : 0;
+        
+        // CA du jour (commun)
         $stmt = $pdo->prepare("SELECT COALESCE(SUM(montant_total), 0) as total FROM tickets 
                                WHERE id_agence = :agence_id AND DATE(date_depot) = :today 
                                AND statut != 'annule'");
         $stmt->execute([':agence_id' => $current_agence_id, ':today' => $today]);
         $res = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($res) {
-            $kpis['total_revenue_today'] = (float)$res['total'];
-        }
-
-        // KPIS: Tickets en attente
+        $kpis['revenue_today'] = $res ? (float)$res['total'] : 0;
+        
+        // Tickets en attente (commun)
         $stmt = $pdo->prepare("SELECT COUNT(id_ticket) as total FROM tickets 
                                WHERE id_agence = :agence_id AND statut = 'en_attente'");
         $stmt->execute([':agence_id' => $current_agence_id]);
         $res = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($res) {
-            $kpis['total_tickets_pending'] = (int)$res['total'];
-        }
-
-        // KPIS: Tickets prêts à récupérer
+        $kpis['pending_tickets'] = $res ? (int)$res['total'] : 0;
+        
+        // Tickets prêts (commun)
         $stmt = $pdo->prepare("SELECT COUNT(id_ticket) as total FROM tickets 
                                WHERE id_agence = :agence_id AND statut = 'pret'");
         $stmt->execute([':agence_id' => $current_agence_id]);
         $res = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($res) {
-            $kpis['total_tickets_ready'] = (int)$res['total'];
-        }
-
-        // KPIS: Alertes stock
-        $stmt = $pdo->prepare("SELECT COUNT(id_produit) as total FROM produits 
-                               WHERE quantite_stock <= seuil_alerte AND est_actif = TRUE");
-        $stmt->execute();
-        $res = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($res) {
-            $kpis['low_stock_count'] = (int)$res['total'];
-        }
-
-        // KPIS: Dépenses du mois
-        $currentMonth = date('Y-m');
-        $stmt = $pdo->prepare("SELECT COALESCE(SUM(montant), 0) as total FROM depenses 
-                               WHERE id_agence = :agence_id AND DATE_FORMAT(date_depense, '%Y-%m') = :month");
-        $stmt->execute([':agence_id' => $current_agence_id, ':month' => $currentMonth]);
-        $res = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($res) {
-            $kpis['total_expenses'] = (float)$res['total'];
-        }
-
-        // Graphique: Tickets par statut
-        $stmt = $pdo->prepare("SELECT statut, COUNT(*) as count FROM tickets 
-                               WHERE id_agence = :agence_id GROUP BY statut ORDER BY statut");
-        $stmt->execute([':agence_id' => $current_agence_id]);
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $status_labels = [
-                'en_attente' => 'En attente',
-                'en_traitement' => 'En traitement',
-                'pret' => 'Prêt',
-                'recupere' => 'Récupéré',
-                'annule' => 'Annulé'
-            ];
-            $chart_data['tickets_by_status']['labels'][] = $status_labels[$row['statut']] ?? $row['statut'];
-            $chart_data['tickets_by_status']['data'][] = (int)$row['count'];
-        }
-
-        // Graphique: Tickets par jour (7 derniers jours)
-        $last7days = date('Y-m-d', strtotime('-6 days'));
-        $stmt = $pdo->prepare("SELECT DATE(date_depot) as jour, COUNT(*) as count FROM tickets 
-                               WHERE id_agence = :agence_id AND DATE(date_depot) >= :last_7_days 
-                               GROUP BY DATE(date_depot) ORDER BY jour ASC");
-        $stmt->execute([':agence_id' => $current_agence_id, ':last_7_days' => $last7days]);
+        $kpis['ready_tickets'] = $res ? (int)$res['total'] : 0;
         
-        // Créer un tableau pour les 7 derniers jours
-        $dates = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $date = date('Y-m-d', strtotime("-$i days"));
-            $dates[$date] = 0;
-            $chart_data['tickets_by_day']['labels'][] = date('d/m', strtotime($date));
+        // Alertes stock (commun si nécessaire)
+        if (in_array('stock', $current_config['kpis']) || in_array('low_stock_count', $current_config['kpis'])) {
+            $stmt = $pdo->prepare("SELECT COUNT(id_produit) as total FROM produits 
+                                   WHERE quantite_stock <= seuil_alerte AND est_actif = TRUE");
+            $stmt->execute();
+            $res = $stmt->fetch(PDO::FETCH_ASSOC);
+            $kpis['low_stock_count'] = $res ? (int)$res['total'] : 0;
         }
         
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $dates[$row['jour']] = (int)$row['count'];
+        // Données spécifiques par rôle
+        switch ($user_role) {
+            case 'admin':
+            case 'directeur':
+            case 'patron':
+                // Données administratives
+                $stmt = $pdo->prepare("SELECT COUNT(id_utilisateur) as total FROM utilisateurs 
+                                       WHERE est_actif = TRUE");
+                $stmt->execute();
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                $kpis['total_employees'] = $res ? (int)$res['total'] : 0;
+                
+                $stmt = $pdo->prepare("SELECT COUNT(id_client) as total FROM clients 
+                                       WHERE est_actif = TRUE");
+                $stmt->execute();
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                $kpis['total_clients'] = $res ? (int)$res['total'] : 0;
+                
+                $stmt = $pdo->prepare("SELECT COALESCE(SUM(montant), 0) as total FROM depenses 
+                                       WHERE DATE_FORMAT(date_depense, '%Y-%m') = :month");
+                $stmt->execute([':month' => $currentMonth]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                $kpis['monthly_expenses'] = $res ? (float)$res['total'] : 0;
+                
+                // Graphiques spécifiques
+                $chart_data = getAdministrationCharts($pdo, $current_agence_id);
+                break;
+                
+            case 'receptionniste':
+            case 'réceptionniste':
+            case 'reception_hotel':
+                // Données réception
+                $stmt = $pdo->prepare("SELECT COUNT(id_client) as total FROM clients 
+                                       WHERE DATE(date_inscription) = :today");
+                $stmt->execute([':today' => $today]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                $kpis['new_clients_today'] = $res ? (int)$res['total'] : 0;
+                
+                // Moyenne ticket
+                $stmt = $pdo->prepare("SELECT AVG(montant_total) as avg FROM tickets 
+                                       WHERE id_agence = :agence_id AND DATE(date_depot) = :today 
+                                       AND statut != 'annule'");
+                $stmt->execute([':agence_id' => $current_agence_id, ':today' => $today]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                $kpis['average_ticket'] = $res ? round((float)$res['avg'], 2) : 0;
+                
+                $chart_data = getReceptionCharts($pdo, $current_agence_id);
+                break;
+                
+            case 'caissier':
+            case 'caissière':
+            case 'caissier_boutique':
+                // Données caisse
+                $stmt = $pdo->prepare("SELECT COUNT(id_ticket) as total FROM tickets 
+                                       WHERE id_agence = :agence_id AND DATE(date_depot) = :today 
+                                       AND statut != 'annule'");
+                $stmt->execute([':agence_id' => $current_agence_id, ':today' => $today]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                $kpis['transactions_today'] = $res ? (int)$res['total'] : 0;
+                
+                $stmt = $pdo->prepare("SELECT mode_paiement, COUNT(*) as count FROM tickets 
+                                       WHERE id_agence = :agence_id AND DATE(date_depot) = :today 
+                                       AND mode_paiement IS NOT NULL GROUP BY mode_paiement");
+                $stmt->execute([':agence_id' => $current_agence_id, ':today' => $today]);
+                $payment_counts = [];
+                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $payment_counts[$row['mode_paiement']] = (int)$row['count'];
+                }
+                
+                $kpis['cash_transactions'] = $payment_counts['especes'] ?? 0;
+                $kpis['card_transactions'] = $payment_counts['carte'] ?? 0;
+                
+                $chart_data = getCashierCharts($pdo, $current_agence_id);
+                break;
+                
+            case 'gestionnaire_stock':
+                // Données stock
+                $stmt = $pdo->prepare("SELECT COUNT(id_produit) as total FROM produits 
+                                       WHERE est_actif = TRUE");
+                $stmt->execute();
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                $kpis['total_products'] = $res ? (int)$res['total'] : 0;
+                
+                $stmt = $pdo->prepare("SELECT SUM(quantite_stock * prix_achat) as total FROM produits 
+                                       WHERE est_actif = TRUE");
+                $stmt->execute();
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                $kpis['stock_value'] = $res ? round((float)$res['total'], 2) : 0;
+                
+                $chart_data = getStockCharts($pdo);
+                break;
+                
+            case 'employe_pressing':
+                // Données employé pressing
+                $stmt = $pdo->prepare("SELECT COUNT(lt.id_ligne) as total FROM lignes_ticket lt
+                                       JOIN tickets t ON lt.id_ticket = t.id_ticket
+                                       WHERE t.id_agence = :agence_id 
+                                       AND t.statut = 'en_traitement'
+                                       AND lt.statut_ligne = 'en_cours'");
+                $stmt->execute([':agence_id' => $current_agence_id]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                $kpis['tickets_to_process'] = $res ? (int)$res['total'] : 0;
+                
+                $stmt = $pdo->prepare("SELECT COUNT(lt.id_ligne) as total FROM lignes_ticket lt
+                                       JOIN tickets t ON lt.id_ticket = t.id_ticket
+                                       WHERE t.id_agence = :agence_id 
+                                       AND DATE(lt.date_fin_traitement) = :today
+                                       AND lt.statut_ligne = 'termine'");
+                $stmt->execute([':agence_id' => $current_agence_id, ':today' => $today]);
+                $res = $stmt->fetch(PDO::FETCH_ASSOC);
+                $kpis['completed_today'] = $res ? (int)$res['total'] : 0;
+                
+                $chart_data = getEmployeeCharts($pdo, $current_agence_id);
+                break;
+                
+            default:
+                // Données par défaut
+                $chart_data = getDefaultCharts($pdo, $current_agence_id);
         }
         
-        $chart_data['tickets_by_day']['data'] = array_values($dates);
-
-        // Graphique: Services les plus populaires (Top 5)
-        $stmt = $pdo->prepare("SELECT s.nom_service, COUNT(lt.id_service) as count 
-                               FROM lignes_ticket lt
-                               JOIN tickets t ON lt.id_ticket = t.id_ticket
-                               JOIN services s ON lt.id_service = s.id_service
-                               WHERE t.id_agence = :agence_id
-                               GROUP BY lt.id_service
-                               ORDER BY count DESC
-                               LIMIT 5");
-        $stmt->execute([':agence_id' => $current_agence_id]);
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $chart_data['services_popularity']['labels'][] = htmlspecialchars($row['nom_service']);
-            $chart_data['services_popularity']['data'][] = (int)$row['count'];
-        }
-
-        // Graphique: CA par catégorie
-        $stmt = $pdo->prepare("SELECT cs.nom_categorie, COALESCE(SUM(lt.sous_total), 0) as total
-                               FROM lignes_ticket lt
-                               JOIN tickets t ON lt.id_ticket = t.id_ticket
-                               JOIN services s ON lt.id_service = s.id_service
-                               JOIN categories_service cs ON s.id_categorie = cs.id_categorie
-                               WHERE t.id_agence = :agence_id AND t.statut != 'annule'
-                               GROUP BY cs.id_categorie
-                               ORDER BY total DESC");
-        $stmt->execute([':agence_id' => $current_agence_id]);
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $chart_data['revenue_by_category']['labels'][] = htmlspecialchars($row['nom_categorie']);
-            $chart_data['revenue_by_category']['data'][] = (float)$row['total'];
-        }
-
-        // Graphique: Nouveaux clients par mois (6 derniers mois)
-        $last6months = date('Y-m-01', strtotime('-5 months'));
-        $stmt = $pdo->prepare("SELECT DATE_FORMAT(date_inscription, '%Y-%m') as mois, COUNT(*) as count 
-                               FROM clients 
-                               WHERE id_agence = :agence_id 
-                               AND DATE(date_inscription) >= :last_6_months 
-                               GROUP BY DATE_FORMAT(date_inscription, '%Y-%m') 
-                               ORDER BY mois ASC");
-        $stmt->execute([':agence_id' => $current_agence_id, ':last_6_months' => $last6months]);
-        
-        $months = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $month = date('Y-m', strtotime("-$i months"));
-            $months[$month] = 0;
-            $chart_data['clients_by_month']['labels'][] = date('M Y', strtotime($month . '-01'));
-        }
-        
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $months[$row['mois']] = (int)$row['count'];
-        }
-        
-        $chart_data['clients_by_month']['data'] = array_values($months);
-
-        // Graphique: Alertes stock
-        $stmt = $pdo->prepare("SELECT nom_produit, quantite_stock, seuil_alerte 
-                               FROM produits 
-                               WHERE quantite_stock <= seuil_alerte 
-                               AND est_actif = TRUE 
-                               ORDER BY (quantite_stock/seuil_alerte) ASC 
-                               LIMIT 5");
-        $stmt->execute();
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $percentage = round(($row['quantite_stock'] / $row['seuil_alerte']) * 100, 1);
-            $chart_data['stock_alerts']['labels'][] = htmlspecialchars($row['nom_produit']);
-            $chart_data['stock_alerts']['data'][] = $percentage;
-        }
-
-        // Graphique: Modes de paiement
-        $stmt = $pdo->prepare("SELECT mode_paiement, COUNT(*) as count FROM tickets 
-                               WHERE id_agence = :agence_id AND mode_paiement IS NOT NULL 
-                               GROUP BY mode_paiement");
-        $stmt->execute([':agence_id' => $current_agence_id]);
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $payment_labels = [
-                'especes' => 'Espèces',
-                'carte' => 'Carte',
-                'cheque' => 'Chèque',
-                'mobile' => 'Mobile',
-                'autre' => 'Autre'
-            ];
-            $chart_data['payment_methods']['labels'][] = $payment_labels[$row['mode_paiement']] ?? $row['mode_paiement'];
-            $chart_data['payment_methods']['data'][] = (int)$row['count'];
-        }
-
-        // Graphique: Dépenses par catégorie (mois en cours)
-        $stmt = $pdo->prepare("SELECT categorie, COALESCE(SUM(montant), 0) as total 
-                               FROM depenses 
-                               WHERE id_agence = :agence_id 
-                               AND DATE_FORMAT(date_depense, '%Y-%m') = :current_month 
-                               GROUP BY categorie");
-        $stmt->execute([':agence_id' => $current_agence_id, ':current_month' => $currentMonth]);
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $expense_labels = [
-                'loyer' => 'Loyer',
-                'salaires' => 'Salaires',
-                'electricite' => 'Électricité',
-                'eau' => 'Eau',
-                'produits' => 'Produits',
-                'maintenance' => 'Maintenance',
-                'autre' => 'Autre'
-            ];
-            $chart_data['expenses_by_category']['labels'][] = $expense_labels[$row['categorie']] ?? $row['categorie'];
-            $chart_data['expenses_by_category']['data'][] = (float)$row['total'];
-        }
-
     } catch (PDOException $e) {
         error_log("Erreur PDO lors de la récupération des données du tableau de bord: " . $e->getMessage());
         $db_error = "Erreur lors du chargement des données des statistiques : " . htmlspecialchars($e->getMessage());
     }
-} else {
-    $db_error = "La connexion à la base de données n'a pas pu être établie. Vérifiez votre configuration.";
 }
 
-// -----------------------------------------------------------
-// 6. Affichage de la Vue
-// -----------------------------------------------------------
+// 9. Fonctions de récupération des graphiques par rôle
+function getAdministrationCharts($pdo, $agence_id) {
+    $data = [];
+    // Implémentation des graphiques pour l'administration
+    return $data;
+}
+
+function getReceptionCharts($pdo, $agence_id) {
+    $data = [];
+    // Implémentation des graphiques pour la réception
+    return $data;
+}
+
+function getCashierCharts($pdo, $agence_id) {
+    $data = [];
+    // Implémentation des graphiques pour la caisse
+    return $data;
+}
+
+function getStockCharts($pdo) {
+    $data = [];
+    // Implémentation des graphiques pour le stock
+    return $data;
+}
+
+function getEmployeeCharts($pdo, $agence_id) {
+    $data = [];
+    // Implémentation des graphiques pour les employés
+    return $data;
+}
+
+function getDefaultCharts($pdo, $agence_id) {
+    $data = [];
+    // Graphiques par défaut
+    return $data;
+}
+
+// 10. Affichage
 require_once('../templates/header.php');
 require_once('../templates/navigation.php');
 ?>
@@ -300,8 +385,6 @@ require_once('../templates/navigation.php');
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/font-awesome.min.css">
     <script src="../js/chart.js" defer></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    
     <style>
         :root {
             --sidebar-width: 250px;
@@ -313,921 +396,336 @@ require_once('../templates/navigation.php');
             --danger-color: #e74c3c;
             --light-color: #f8f9fa;
             --border-color: #dee2e6;
-            --gray-medium: #6c757d;
-            --gray-light: #e9ecef;
-            --transition-speed: 0.3s;
         }
 
-        /* Structure principale avec décalage pour la sidebar */
         .dashboard-wrapper {
             margin-left: var(--sidebar-width);
             padding: 2rem 1.5rem;
             min-height: 100vh;
             background-color: var(--light-color);
-            transition: all var(--transition-speed) ease;
             width: calc(100% - var(--sidebar-width));
         }
 
-        .dashboard-container { 
-            max-width: 1400px;
-            margin: 0 auto;
-            width: 100%;
-        }
-        
-        .page-header { 
-            border-bottom: 0.2rem solid var(--primary-color);
-            padding-bottom: 1rem;
-            margin: 1.5rem 0 2rem;
-            color: var(--primary-color);
-            font-size: 1.8rem;
-            font-weight: 600;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        /* Panel Styling */
-        .panel {
-            margin-bottom: 1.5rem;
-            box-shadow: 0 0.1rem 0.3rem rgba(0, 0, 0, 0.08);
-            border-radius: 0.6rem;
-            border: 0.1rem solid var(--border-color);
-            background: white;
-            transition: all var(--transition-speed) ease;
-            height: 100%;
-            overflow: hidden;
-        }
-        
-        .panel:hover {
-            transform: translateY(-0.1rem);
-            box-shadow: 0 0.3rem 0.6rem rgba(0, 0, 0, 0.1);
-        }
-        
-        .panel-heading {
-            padding: 1.2rem 1.5rem;
+        .welcome-header {
             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             color: white;
-            border-bottom: none;
-            font-weight: 600;
-            font-size: 1rem;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        .panel-body { 
-            padding: 1.5rem;
+            padding: 2rem;
+            border-radius: 0.6rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 0.3rem 0.6rem rgba(0,0,0,0.1);
         }
 
-        /* KPI Specific Styling */
+        .welcome-header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-header .subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .role-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 0.3rem 0.8rem;
+            border-radius: 2rem;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05rem;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-card {
+            background: white;
+            border-radius: 0.6rem;
+            padding: 1.5rem;
+            box-shadow: 0 0.1rem 0.3rem rgba(0,0,0,0.08);
+            border-left: 0.4rem solid var(--accent-color);
+            transition: all 0.3s ease;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-0.2rem);
+            box-shadow: 0 0.3rem 0.6rem rgba(0,0,0,0.1);
+        }
+
         .kpi-value {
-            font-size: 1.6rem;
+            font-size: 1.8rem;
             font-weight: 700;
             margin-bottom: 0.5rem;
-            line-height: 1.2;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
+
         .kpi-label {
-            font-size: 0.85rem;
-            color: var(--gray-medium);
+            font-size: 0.9rem;
+            color: var(--secondary-color);
             text-transform: uppercase;
-            font-weight: 500;
             letter-spacing: 0.05rem;
-            line-height: 1.2;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        /* KPI Panel Color Variations */
-        .panel-primary {
-            border-left: 0.4rem solid var(--accent-color);
-        }
-        
-        .panel-warning {
-            border-left: 0.4rem solid var(--warning-color);
-        }
-        
-        .panel-success {
-            border-left: 0.4rem solid var(--success-color);
-        }
-        
-        .panel-danger {
-            border-left: 0.4rem solid var(--danger-color);
-        }
-        
-        .panel-info {
-            border-left: 0.4rem solid #17a2b8;
+        .kpi-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--accent-color);
         }
 
-        /* Chart Specific Styling */
         .chart-container {
-            position: relative;
-            height: 280px;
-            width: 100%;
-            margin: auto;
-        }
-        
-        canvas {
-            max-width: 100%;
-            height: 100% !important;
+            background: white;
+            border-radius: 0.6rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 0.1rem 0.3rem rgba(0,0,0,0.08);
         }
 
-        /* Quick Access Buttons */
-        .quick-access-btn {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            border: none;
-            color: white;
-            padding: 0.8rem 1.5rem;
+        .chart-title {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
             font-weight: 600;
-            font-size: 0.95rem;
-            transition: all var(--transition-speed) ease;
-            border-radius: 0.4rem;
-            width: 100%;
-            display: block;
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .action-btn {
+            background: white;
+            border: 2px solid var(--accent-color);
+            color: var(--accent-color);
+            padding: 1rem;
+            border-radius: 0.6rem;
             text-align: center;
             text-decoration: none;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transition: all 0.3s ease;
+            font-weight: 600;
         }
-        
-        .quick-access-btn:hover {
-            background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
-            transform: translateY(-0.1rem);
+
+        .action-btn:hover {
+            background: var(--accent-color);
             color: white;
-            box-shadow: 0 0.2rem 0.4rem rgba(0, 0, 0, 0.15);
             text-decoration: none;
+            transform: translateY(-0.1rem);
         }
 
-        .quick-access-btn.warning {
-            background: linear-gradient(135deg, var(--warning-color), #e67e22);
-        }
-        
-        .quick-access-btn.success {
-            background: linear-gradient(135deg, var(--success-color), #27ae60);
-        }
-        
-        .quick-access-btn.danger {
-            background: linear-gradient(135deg, var(--danger-color), #c0392b);
-        }
-
-        /* Alert Styling */
-        .alert {
-            border-radius: 0.6rem;
-            border: none;
-            box-shadow: 0 0.1rem 0.3rem rgba(0,0,0,0.1);
-            padding: 1rem 1.2rem;
-            margin-bottom: 1.5rem;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        .alert-danger {
-            background-color: rgba(220, 53, 69, 0.1);
-            border-left: 0.4rem solid #dc3545;
-            color: #dc3545;
-        }
-
-        /* No Data State */
         .no-data {
             text-align: center;
-            padding: 2.5rem 1.5rem;
-            color: var(--gray-medium);
+            padding: 3rem;
+            color: #6c757d;
             font-style: italic;
-            font-size: 0.9rem;
-            height: 200px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        /* Badge for alerts */
-        .badge-alert {
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            background-color: var(--danger-color);
-            color: white;
-            border-radius: 50%;
-            padding: 4px 8px;
-            font-size: 0.7rem;
-            font-weight: bold;
-        }
-
-        /* Status colors */
-        .status-badge {
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        
-        .status-en_attente { background-color: #ffc107; color: #000; }
-        .status-en_traitement { background-color: #17a2b8; color: #fff; }
-        .status-pret { background-color: #28a745; color: #fff; }
-        .status-recupere { background-color: #6c757d; color: #fff; }
-        .status-annule { background-color: #dc3545; color: #fff; }
-
-        /* Responsive Design */
-        @media (max-width: 1200px) {
-            .dashboard-wrapper {
-                margin-left: 220px;
-                width: calc(100% - 220px);
-                padding: 1.5rem;
-            }
-            
-            .kpi-value {
-                font-size: 1.4rem;
-            }
-            
-            .chart-container {
-                height: 240px;
-            }
-            
-            .page-header {
-                font-size: 1.6rem;
-            }
         }
 
         @media (max-width: 992px) {
             .dashboard-wrapper {
                 margin-left: 0;
                 width: 100%;
-                padding: 1.5rem;
-            }
-            
-            .page-header {
-                font-size: 1.5rem;
-                margin: 1rem 0 1.5rem;
-                text-align: center;
-            }
-            
-            .kpi-value {
-                font-size: 1.3rem;
-            }
-            
-            .chart-container {
-                height: 220px;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .dashboard-wrapper {
                 padding: 1rem;
             }
             
-            .chart-container {
-                height: 200px;
+            .kpi-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             }
-            
-            .panel-body {
-                padding: 1rem;
-            }
-            
-            .panel-heading {
-                padding: 1rem;
-            }
-        }
-
-        @media (max-width: 576px) {
-            .chart-container {
-                height: 180px;
-            }
-            
-            .kpi-value {
-                font-size: 1.2rem;
-            }
-        }
-
-        /* Animation pour le chargement */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(1rem); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
-        }
-        
-        /* Section spacing */
-        .section-spacing {
-            margin-bottom: 2rem;
-        }
-        
-        /* Today's date */
-        .today-date {
-            color: var(--gray-medium);
-            font-size: 0.9rem;
-            margin-top: -0.5rem;
-            margin-bottom: 1.5rem;
         }
     </style>
 </head>
 <body>
 
-<!-- Structure principale avec sidebar et contenu -->
-<div class="dashboard-wrapper fade-in">
+<div class="dashboard-wrapper">
     <div class="dashboard-container">
-    </BR> </BR>
-        <h2 class="page-header">Tableau de Bord Pressing</h2>
-        <div class="today-date"><?= date('d/m/Y') ?></div>
+        
+        <!-- En-tête personnalisé -->
+        <div class="welcome-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1><?= $current_config['title'] ?></h1>
+                    <div class="subtitle">
+                        Bienvenue, <strong><?= htmlspecialchars($user_name) ?></strong>
+                        <span class="role-badge ml-2"><?= htmlspecialchars($user_role) ?></span>
+                        <span class="ml-2">Agence: <?= htmlspecialchars($user_agence) ?></span>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-white"><?= date('d/m/Y H:i') ?></div>
+                    <small>Dernière mise à jour: <?= date('H:i') ?></small>
+                </div>
+            </div>
+        </div>
 
         <?php if (isset($db_error)): ?>
-            <div class="alert alert-danger" role="alert">
+            <div class="alert alert-danger">
                 <strong>Erreur :</strong> <?= htmlspecialchars($db_error) ?>
             </div>
         <?php endif; ?>
 
-        <!-- Section KPIs -->
-        <div class="row section-spacing">
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel panel-primary">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Tickets du Jour</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="kpi-value" style="color: var(--accent-color);"><?= number_format($kpis['total_tickets_today'], 0, ',', ' ') ?></div>
-                        <div class="kpi-label">Nouveaux tickets aujourd'hui</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel panel-success">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Chiffre d'Affaires</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="kpi-value" style="color: var(--success-color);"><?= number_format($kpis['total_revenue_today'], 0, ',', ' ') ?> FCFA</div>
-                        <div class="kpi-label">CA du jour</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel panel-warning">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">À Traiter</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="kpi-value" style="color: var(--warning-color);"><?= number_format($kpis['total_tickets_pending'], 0, ',', ' ') ?></div>
-                        <div class="kpi-label">Tickets en attente</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel panel-info">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Prêts à Récupérer</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="kpi-value" style="color: #17a2b8;"><?= number_format($kpis['total_tickets_ready'], 0, ',', ' ') ?></div>
-                        <div class="kpi-label">Tickets terminés</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row section-spacing">
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel panel-primary">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Clients Actifs</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="kpi-value" style="color: var(--accent-color);"><?= number_format($kpis['total_clients'], 0, ',', ' ') ?></div>
-                        <div class="kpi-label">Clients enregistrés</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel panel-warning">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">
-                            Alertes Stock
-                            <?php if ($kpis['low_stock_count'] > 0): ?>
-                                <span class="badge-alert"><?= $kpis['low_stock_count'] ?></span>
+        <!-- Section KPIs dynamiques -->
+        <div class="kpi-grid">
+            <?php 
+            // Affichage dynamique des KPIs selon le rôle
+            $kpi_display = [
+                'tickets_today' => ['Tickets du Jour', 'fa-ticket-alt', 'primary'],
+                'revenue_today' => ['CA du Jour', 'fa-money-bill-wave', 'success'],
+                'pending_tickets' => ['En Attente', 'fa-clock', 'warning'],
+                'ready_tickets' => ['Prêts', 'fa-check-circle', 'info'],
+                'low_stock_count' => ['Alertes Stock', 'fa-exclamation-triangle', 'danger'],
+                'new_clients_today' => ['Nouveaux Clients', 'fa-user-plus', 'primary'],
+                'total_employees' => ['Employés', 'fa-users', 'info'],
+                'total_clients' => ['Clients Totaux', 'fa-address-book', 'success'],
+                'monthly_expenses' => ['Dépenses Mois', 'fa-chart-line', 'danger'],
+                'transactions_today' => ['Transactions', 'fa-exchange-alt', 'primary'],
+                'average_ticket' => ['Moyenne Ticket', 'fa-calculator', 'info'],
+                'total_products' => ['Produits', 'fa-box', 'success'],
+                'stock_value' => ['Valeur Stock', 'fa-database', 'warning'],
+                'tickets_to_process' => ['À Traiter', 'fa-cogs', 'primary'],
+                'completed_today' => ['Terminés', 'fa-check-double', 'success'],
+                'cash_transactions' => ['Espèces', 'fa-coins', 'warning'],
+                'card_transactions' => ['Cartes', 'fa-credit-card', 'info']
+            ];
+            
+            foreach ($current_config['kpis'] as $kpi_key) {
+                if (isset($kpis[$kpi_key]) && isset($kpi_display[$kpi_key])) {
+                    $kpi_info = $kpi_display[$kpi_key];
+                    $value = $kpis[$kpi_key];
+                    $formatted_value = is_numeric($value) ? number_format($value, 0, ',', ' ') : $value;
+                    $color_class = 'text-' . $kpi_info[2];
+                    ?>
+                    <div class="kpi-card">
+                        <div class="kpi-icon <?= $color_class ?>">
+                           
+                        </div>
+                        <div class="kpi-value <?= $color_class ?>">
+                            <?= $formatted_value ?>
+                            <?php if (strpos($kpi_key, 'revenue') !== false || strpos($kpi_key, 'expense') !== false || strpos($kpi_key, 'value') !== false): ?>
+                                <small>FCFA</small>
                             <?php endif; ?>
-                        </h3>
+                        </div>
+                        <div class="kpi-label"><?= $kpi_info[0] ?></div>
                     </div>
-                    <div class="panel-body">
-                        <div class="kpi-value" style="color: var(--warning-color);"><?= number_format($kpis['low_stock_count'], 0, ',', ' ') ?></div>
-                        <div class="kpi-label">Produits en rupture</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel panel-danger">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Dépenses du Mois</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="kpi-value" style="color: var(--danger-color);"><?= number_format($kpis['total_expenses'], 0, ',', ' ') ?> FCFA</div>
-                        <div class="kpi-label">Total dépenses ce mois</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel panel-info">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Total Tickets</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="kpi-value" style="color: #17a2b8;"><?= number_format($kpis['total_tickets'], 0, ',', ' ') ?></div>
-                        <div class="kpi-label">Tous tickets confondus</div>
-                    </div>
-                </div>
-            </div>
+                    <?php
+                }
+            }
+            ?>
         </div>
 
         <!-- Section Graphiques -->
-        <div class="row section-spacing">
-            <div class="col-xl-6 col-lg-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Répartition des Tickets par Statut</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="chart-container">
-                            <canvas id="ticketsByStatusChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-6 col-lg-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Activité des 7 Derniers Jours</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="chart-container">
-                            <canvas id="ticketsByDayChart"></canvas>
-                        </div>
+        <?php if (!empty($current_config['charts'])): ?>
+        <div class="chart-container">
+            <h3 class="chart-title">Statistiques et Analyses</h3>
+            <div class="row">
+                <?php foreach ($current_config['charts'] as $chart_index => $chart_key): ?>
+                <div class="col-md-6 mb-4">
+                    <div class="chart-placeholder">
+                        <h5><?= ucfirst(str_replace('_', ' ', $chart_key)) ?></h5>
+                        <div class="chart-canvas" id="chart-<?= $chart_index ?>" style="height: 300px;"></div>
                     </div>
                 </div>
+                <?php endforeach; ?>
             </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Section Actions Rapides -->
+        <div class="quick-actions">
+            <?php 
+            $actions_display = [
+                'new_ticket' => ['Nouveau Ticket', 'fa-plus-circle', 'tickets/create.php'],
+                'pending_tickets' => ['Tickets En Attente', 'fa-clock', 'tickets/list.php?status=en_attente'],
+                'ready_tickets' => ['Tickets Prêts', 'fa-check-circle', 'tickets/list.php?status=pret'],
+                'new_client' => ['Nouveau Client', 'fa-user-plus', 'clients/create.php'],
+                'ticket_list' => ['Liste Tickets', 'fa-list', 'tickets/list.php'],
+                'stock' => ['Gestion Stock', 'fa-boxes', 'stock/inventory.php'],
+                'settings' => ['Paramètres', 'fa-cog', 'settings/index.php'],
+                'reports' => ['Rapports', 'fa-chart-bar', 'reports/daily.php'],
+                'manage_users' => ['Gestion Utilisateurs', 'fa-users-cog', 'admin/users.php'],
+                'financial_reports' => ['Rapports Financiers', 'fa-file-invoice-dollar', 'reports/financial.php'],
+                'performance' => ['Performance', 'fa-chart-line', 'analytics/performance.php'],
+                'analytics' => ['Analyses', 'fa-chart-pie', 'analytics/dashboard.php'],
+                'process_tickets' => ['Traiter Tickets', 'fa-cogs', 'processing/tickets.php'],
+                'quality_check' => ['Contrôle Qualité', 'fa-clipboard-check', 'quality/check.php'],
+                'new_sale' => ['Nouvelle Vente', 'fa-shopping-cart', 'sales/create.php'],
+                'view_transactions' => ['Transactions', 'fa-exchange-alt', 'caisse/transactions.php'],
+                'cash_close' => ['Clôture Caisse', 'fa-cash-register', 'caisse/close.php'],
+                'inventory_check' => ['Vérifier Stock', 'fa-clipboard-list', 'stock/check.php'],
+                'room_cleaning' => ['Nettoyage Chambres', 'fa-broom', 'housekeeping/rooms.php'],
+                'sales_dashboard' => ['Tableau Ventes', 'fa-store', 'sales/dashboard.php']
+            ];
+            
+            foreach ($current_config['quick_actions'] as $action_key) {
+                if (isset($actions_display[$action_key])) {
+                    $action_info = $actions_display[$action_key];
+                    ?>
+                    <a href="../pages/<?= $action_info[2] ?>" class="action-btn">
+            
+                        <?= $action_info[0] ?>
+                    </a>
+                    <?php
+                }
+            }
+            ?>
         </div>
 
-        <div class="row section-spacing">
-            <div class="col-xl-6 col-lg-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Top 5 Services les Plus Demandés</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="chart-container">
-                            <canvas id="servicesPopularityChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-6 col-lg-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Chiffre d'Affaires par Catégorie</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="chart-container">
-                            <canvas id="revenueByCategoryChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row section-spacing">
-            <div class="col-xl-6 col-lg-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Nouveaux Clients (6 Derniers Mois)</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="chart-container">
-                            <canvas id="clientsByMonthChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-6 col-lg-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Alertes Stock (Niveau Bas)</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="chart-container">
-                            <canvas id="stockAlertsChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row section-spacing">
-            <div class="col-xl-6 col-lg-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Répartition des Modes de Paiement</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="chart-container">
-                            <canvas id="paymentMethodsChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-6 col-lg-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Dépenses par Catégorie (Mois en Cours)</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="chart-container">
-                            <canvas id="expensesByCategoryChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Section Accès Rapides -->
-        <h3 class="page-header">Accès Rapides</h3>
-        <div class="row">
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Nouveau Ticket</h3>
-                    </div>
-                    <div class="panel-body text-center">
-                        <a href="../pages/tickets/create.php" class="btn quick-access-btn success">
-                            <i class="fas fa-plus-circle"></i> Créer Ticket
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Tickets en Attente</h3>
-                    </div>
-                    <div class="panel-body text-center">
-                        <a href="../pages/tickets/list.php?status=en_attente" class="btn quick-access-btn warning">
-                            <i class="fas fa-clock"></i> Voir <?= $kpis['total_tickets_pending'] ?> tickets
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Prêts à Récupérer</h3>
-                    </div>
-                    <div class="panel-body text-center">
-                        <a href="../pages/tickets/list.php?status=pret" class="btn quick-access-btn info">
-                            <i class="fas fa-check-circle"></i> Voir <?= $kpis['total_tickets_ready'] ?> tickets
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Gestion Stock</h3>
-                    </div>
-                    <div class="panel-body text-center">
-                        <a href="../pages/stock/inventory.php" class="btn quick-access-btn danger">
-                            <i class="fas fa-boxes"></i> Vérifier stocks
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="row">
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Nouveau Client</h3>
-                    </div>
-                    <div class="panel-body text-center">
-                        <a href="../pages/clients/create.php" class="btn quick-access-btn">
-                            <i class="fas fa-user-plus"></i> Ajouter client
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Rapport Journalier</h3>
-                    </div>
-                    <div class="panel-body text-center">
-                        <a href="../pages/reports/daily.php" class="btn quick-access-btn">
-                            <i class="fas fa-chart-bar"></i> Rapport du jour
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Caisse du Jour</h3>
-                    </div>
-                    <div class="panel-body text-center">
-                        <a href="../pages/caisse/index.php" class="btn quick-access-btn">
-                            <i class="fas fa-cash-register"></i> Gérer caisse
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 col-12">
-                <div class="panel">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">Paramètres</h3>
-                    </div>
-                    <div class="panel-body text-center">
-                        <a href="../pages/settings/index.php" class="btn quick-access-btn">
-                            <i class="fas fa-cog"></i> Paramètres
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
 <script src="../js/jquery-3.7.1.js"></script>
 <script src="../js/bootstrap.min.js"></script>
+<script src="../js/chart.js"></script>
 <script>
 $(document).ready(function() {
-    // PHP variables are encoded as JSON and passed to JavaScript
-    const chartData = <?= json_encode($chart_data) ?>;
-
-    // Professional color palette
-    const professionalColors = [
+    // Initialisation des graphiques
+    // Cette partie devrait être complétée avec les données réelles
+    // Pour l'instant, nous affichons des graphiques de démonstration
+    
+    const colors = [
         '#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6',
-        '#1abc9c', '#d35400', '#c0392b', '#16a085', '#8e44ad',
-        '#2980b9', '#27ae60', '#8e44ad', '#f1c40f', '#e67e22'
+        '#1abc9c', '#d35400', '#c0392b', '#16a085', '#8e44ad'
     ];
-
-    // Status colors for tickets
-    const statusColors = {
-        'En attente': '#ffc107',
-        'En traitement': '#17a2b8',
-        'Prêt': '#28a745',
-        'Récupéré': '#6c757d',
-        'Annulé': '#dc3545'
-    };
-
-    // Configuration des graphiques
-    function renderChart(id, type, dataKey, title, customColors = null) {
-        const ctx = document.getElementById(id);
-        if (!ctx) {
-            console.warn(`Canvas element with ID '${id}' not found.`);
-            return null;
-        }
-
-        // Check if data exists
-        if (!chartData[dataKey] || !chartData[dataKey].data || chartData[dataKey].data.length === 0) {
-            showNoDataMessage(id);
-            return null;
-        }
-
-        // Choose colors based on chart type and data
-        let colors = [];
-        const dataLength = chartData[dataKey].data.length;
-        const labels = chartData[dataKey].labels;
-        
-        if (customColors && Array.isArray(customColors)) {
-            colors = customColors.slice(0, Math.min(dataLength, customColors.length));
-        } else if (type === 'pie' || type === 'doughnut') {
-            // Use status colors for tickets by status chart
-            if (id === 'ticketsByStatusChart') {
-                colors = labels.map(label => statusColors[label] || professionalColors[0]);
-            } else {
-                colors = professionalColors.slice(0, Math.min(dataLength, professionalColors.length));
-            }
-        } else if (type === 'line' || type === 'bar') {
-            colors = [professionalColors[0]];
-        } else {
-            colors = [professionalColors[0]];
-        }
-
-        const chart = new Chart(ctx, {
-            type: type,
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: title,
-                    data: chartData[dataKey].data,
-                    backgroundColor: type === 'pie' || type === 'doughnut' ? colors : 
-                                  type === 'bar' ? colors[0] : 'rgba(52, 152, 219, 0.1)',
-                    borderColor: type === 'bar' ? colors[0] : professionalColors[0],
-                    borderWidth: 2,
-                    fill: type === 'line' ? {
-                        target: 'origin',
-                        above: 'rgba(52, 152, 219, 0.1)',
-                        below: 'rgba(52, 152, 219, 0.1)'
-                    } : true,
-                    tension: type === 'line' ? 0.3 : 0,
-                    pointBackgroundColor: professionalColors[0],
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: {
-                            font: {
-                                size: 12,
-                                family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
-                            },
-                            color: '#2c3e50',
-                            padding: 10,
-                            usePointStyle: true
-                        }
-                    },
-                    title: {
-                        display: false,
-                        text: title
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(44, 62, 80, 0.9)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: professionalColors[0],
-                        borderWidth: 1,
-                        padding: 10,
-                        cornerRadius: 4,
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (label) {
-                                    label += ': ';
-                                }
-                                if (context.parsed !== null) {
-                                    if (id.includes('revenue') || id.includes('expenses') || id.includes('CA') || 
-                                        dataKey.includes('revenue') || dataKey.includes('expense')) {
-                                        label += new Intl.NumberFormat('fr-FR', { 
-                                            style: 'currency', 
-                                            currency: 'XAF',
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 0
-                                        }).format(context.parsed);
-                                    } else if (id.includes('stockAlerts') || dataKey.includes('stock')) {
-                                        label += context.parsed + '%';
-                                    } else {
-                                        label += new Intl.NumberFormat('fr-FR').format(context.parsed);
-                                    }
-                                }
-                                return label;
-                            }
-                        }
-                    }
+    
+    // Exemple de création de graphiques
+    <?php foreach ($current_config['charts'] as $chart_index => $chart_key): ?>
+    try {
+        const ctx<?= $chart_index ?> = document.getElementById('chart-<?= $chart_index ?>');
+        if (ctx<?= $chart_index ?>) {
+            new Chart(ctx<?= $chart_index ?>, {
+                type: 'bar',
+                data: {
+                    labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun'],
+                    datasets: [{
+                        label: '<?= ucfirst(str_replace('_', ' ', $chart_key)) ?>',
+                        data: [65, 59, 80, 81, 56, 55],
+                        backgroundColor: colors,
+                        borderColor: 'rgba(0, 0, 0, 0.1)',
+                        borderWidth: 1
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.05)',
-                            drawBorder: false
-                        },
-                        ticks: {
-                            font: {
-                                family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-                                size: 11
-                            },
-                            color: '#6c757d',
-                            padding: 8,
-                            callback: function(value) {
-                                if (id.includes('revenue') || id.includes('expenses') || id.includes('CA') || 
-                                    dataKey.includes('revenue') || dataKey.includes('expense')) {
-                                    if (value >= 1000000) {
-                                        return (value / 1000000).toFixed(1) + 'M';
-                                    } else if (value >= 1000) {
-                                        return (value / 1000).toFixed(1) + 'K';
-                                    }
-                                    return value;
-                                }
-                                if (value >= 1000) {
-                                    return (value / 1000).toFixed(1) + 'K';
-                                }
-                                return value;
-                            }
-                        }
-                    },
-                    x: {
-                        grid: {
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
                             display: false
-                        },
-                        ticks: {
-                            font: {
-                                family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-                                size: 11
-                            },
-                            color: '#6c757d',
-                            padding: 8,
-                            maxRotation: 45,
-                            minRotation: 0
                         }
-                    }
-                },
-                interaction: {
-                    intersect: false,
-                    mode: 'index'
-                },
-                elements: {
-                    line: {
-                        tension: 0.3
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
                     }
                 }
-            }
-        });
-
-        return chart;
+            });
+        }
+    } catch (e) {
+        console.error('Erreur création graphique:', e);
     }
-
-    function showNoDataMessage(chartId) {
-        const canvas = document.getElementById(chartId);
-        if (canvas) {
-            const container = canvas.closest('.chart-container');
-            if (container) {
-                container.innerHTML = '<div class="no-data">Aucune donnée disponible pour ce graphique</div>';
-            }
-        }
-    }
-
-    // Initialisation des graphiques
-    try {
-        // Diagramme circulaire pour les tickets par statut
-        if (chartData.tickets_by_status.data.length > 0) {
-            renderChart('ticketsByStatusChart', 'doughnut', 'tickets_by_status', 'Tickets par Statut');
-        } else {
-            showNoDataMessage('ticketsByStatusChart');
-        }
-
-        // Ligne pour l'activité des 7 derniers jours
-        if (chartData.tickets_by_day.data.length > 0) {
-            renderChart('ticketsByDayChart', 'line', 'tickets_by_day', 'Tickets par Jour');
-        } else {
-            showNoDataMessage('ticketsByDayChart');
-        }
-
-        // Diagramme en barres pour les services populaires
-        if (chartData.services_popularity.data.length > 0) {
-            renderChart('servicesPopularityChart', 'bar', 'services_popularity', 'Services les Plus Demandés');
-        } else {
-            showNoDataMessage('servicesPopularityChart');
-        }
-
-        // Diagramme circulaire pour le CA par catégorie
-        if (chartData.revenue_by_category.data.length > 0) {
-            renderChart('revenueByCategoryChart', 'pie', 'revenue_by_category', 'CA par Catégorie');
-        } else {
-            showNoDataMessage('revenueByCategoryChart');
-        }
-
-        // Barres pour les nouveaux clients
-        if (chartData.clients_by_month.data.length > 0) {
-            renderChart('clientsByMonthChart', 'bar', 'clients_by_month', 'Nouveaux Clients');
-        } else {
-            showNoDataMessage('clientsByMonthChart');
-        }
-
-        // Barres pour les alertes stock
-        if (chartData.stock_alerts.data.length > 0) {
-            // Use danger colors for stock alerts
-            const dangerColors = chartData.stock_alerts.data.map(value => 
-                value < 20 ? '#e74c3c' : 
-                value < 50 ? '#f39c12' : 
-                '#3498db'
-            );
-            renderChart('stockAlertsChart', 'bar', 'stock_alerts', 'Niveau de Stock (%)', dangerColors);
-        } else {
-            showNoDataMessage('stockAlertsChart');
-        }
-
-        // Diagramme circulaire pour les modes de paiement
-        if (chartData.payment_methods.data.length > 0) {
-            renderChart('paymentMethodsChart', 'doughnut', 'payment_methods', 'Modes de Paiement');
-        } else {
-            showNoDataMessage('paymentMethodsChart');
-        }
-
-        // Diagramme circulaire pour les dépenses
-        if (chartData.expenses_by_category.data.length > 0) {
-            renderChart('expensesByCategoryChart', 'pie', 'expenses_by_category', 'Dépenses par Catégorie');
-        } else {
-            showNoDataMessage('expensesByCategoryChart');
-        }
-
-    } catch (error) {
-        console.error('Erreur lors du rendu des graphiques:', error);
-    }
-
-    // Gestion du responsive
-    $(window).on('resize', function() {
-        // Chart.js gère automatiquement le redimensionnement
-    });
+    <?php endforeach; ?>
     
-    // Auto-refresh every 5 minutes (300000 ms)
+    // Auto-refresh toutes les 5 minutes
     setTimeout(function() {
         location.reload();
     }, 300000);
@@ -1235,3 +733,6 @@ $(document).ready(function() {
 </script>
 </body>
 </html>
+<?php 
+require_once('../templates/footer.php');
+?>

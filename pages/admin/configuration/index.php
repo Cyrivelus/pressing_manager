@@ -1,38 +1,29 @@
 <?php
 // pages/admin/configuration/index.php
 
-// Démarrer la session pour la gestion de l'authentification
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-// Vérifier si l'utilisateur est connecté et est un administrateur
 if (!isset($_SESSION['utilisateur_id']) || $_SESSION['role'] !== 'patron') {
-    // Rediriger si non autorisé
     header("Location: ../../../index.php?error=Accès non autorisé");
     exit();
 }
 
-// Inclure les fichiers nécessaires
 require_once('../../../fonctions/database.php');
 
-// Définir le titre de la page
 $titre = "Configuration Générale";
 $admin_style = true;
 
-
-// Gérer les messages flash
 $flash_message = $_SESSION['flash_message'] ?? null;
 $flash_type = $_SESSION['flash_type'] ?? null;
 unset($_SESSION['flash_message'], $_SESSION['flash_type']);
 
-// Lire la configuration depuis le fichier config.ini
 $configFile = '../../../fonctions/config/config.ini';
 $config = parse_ini_file($configFile, true);
 
-// Vérifier si le fichier de configuration a été lu correctement
 if ($config === false) {
-    $errorMessage = "Erreur lors de la lecture du fichier de configuration.";
+    $errorMessage = "Erreur de lecture du fichier système.";
 }
 
 include('../../../templates/header.php');
@@ -46,495 +37,245 @@ include('../../../templates/navigation.php');
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $titre ?></title>
     <link rel="stylesheet" href="<?= generateUrl('../../css/bootstrap.min.css') ?>">
-    <link rel="stylesheet" href="<?= generateUrl('../../css/all.min.css') ?>">
     <style>
+        :root {
+            --primary-color: #2c3e50;
+            --border-color: #dee2e6;
+            --text-muted: #6c757d;
+            --bg-light: #f8f9fa;
+        }
+
+        body { background-color: #f4f7f6; color: #333; font-family: 'Segoe UI', Roboto, sans-serif; }
+
         .configuration-container {
-            margin-left: 230px;
-            padding: 20px;
+            margin-left: 130px;
+            padding: 30px;
             transition: margin-left 0.3s ease;
         }
         
-        body.collapsed-sidebar .configuration-container { 
-            margin-left: 70px; 
-        }
+        body.collapsed-sidebar .configuration-container { margin-left: 70px; }
         
-        @media (max-width: 992px) { 
-            .configuration-container { 
-                margin-left: 0 !important; 
-            } 
-        }
-        
+        @media (max-width: 992px) { .configuration-container { margin-left: 0 !important; } }
+
+        /* Style des cartes pro */
         .card {
-            border-radius: 10px;
-            border: 1px solid #e0e0e0;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
-        }
-        
-        .card-header {
-            background-color: #f8f9fa;
-            border-bottom: 1px solid #e0e0e0;
-            padding: 15px 20px;
-            font-weight: 600;
-        }
-        
-        .card-body {
-            padding: 20px;
-        }
-        
-        .param-card {
-            transition: transform 0.2s;
-        }
-        
-        .param-card:hover {
-            transform: translateY(-3px);
-        }
-        
-        .config-section {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .config-icon {
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-        }
-        
-        .param-label {
-            font-weight: 500;
-            color: #495057;
-            min-width: 200px;
-        }
-        
-        .param-value {
-            background: white;
-            padding: 8px 12px;
             border-radius: 4px;
-            border: 1px solid #dee2e6;
-            flex-grow: 1;
+            border: 1px solid var(--border-color);
+            box-shadow: none;
+            background: #fff;
+            margin-bottom: 25px;
         }
-        
+
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 20px;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            color: var(--primary-color);
+        }
+
+        /* Stats cards épurées */
+        .stat-box {
+            padding: 20px;
+            border-left: 4px solid var(--primary-color);
+        }
+        .stat-box small { color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
+        .stat-box h3 { margin: 5px 0 0; font-weight: 700; color: var(--primary-color); }
+
+        /* Groupes de paramètres */
         .param-group {
             display: flex;
             align-items: center;
-            margin-bottom: 15px;
-            padding: 10px;
-            border-bottom: 1px solid #f1f1f1;
+            padding: 12px 0;
+            border-bottom: 1px solid #f8f9fa;
         }
-        
-        .badge-config {
-            font-size: 0.8em;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-weight: 500;
+        .param-group:last-child { border-bottom: none; }
+
+        .param-label {
+            width: 250px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #444;
         }
-        
-        .config-logs {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
+
+        .param-value {
+            flex-grow: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            padding: 4px 8px;
+            background: #f9f9f9;
+            border-radius: 3px;
         }
-        
-        .config-database {
-            background: #d1ecf1;
-            border-left: 4px solid #17a2b8;
+
+        .btn { border-radius: 2px; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+        .btn-outline-primary { color: var(--primary-color); border-color: var(--primary-color); }
+        .btn-outline-primary:hover { background-color: var(--primary-color); color: #fff; }
+
+        .section-title {
+            border-bottom: 2px solid var(--primary-color);
+            display: inline-block;
+            margin-bottom: 20px;
+            padding-bottom: 5px;
+            font-weight: 800;
         }
-        
-        .config-app {
-            background: #d4edda;
-            border-left: 4px solid #28a745;
-        }
-        
-        .config-security {
-            background: #f8d7da;
-            border-left: 4px solid #dc3545;
-        }
-        
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        
-        .status-indicator {
-            width: 10px;
-            height: 10px;
+
+        .status-dot {
+            height: 8px;
+            width: 8px;
+            background-color: #28a745;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 5px;
-        }
-        
-        .status-active { background-color: #28a745; }
-        .status-warning { background-color: #ffc107; }
-        .status-inactive { background-color: #dc3545; }
-        
-        .backup-info {
-            background: #e9ecef;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 15px;
+            margin-right: 8px;
         }
     </style>
 </head>
 <body>
-
+<br> <br> <br> 
 <div class="configuration-container">
     <div class="row mb-4">
         <div class="col-12">
             <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="<?= generateUrl('pages/dashboard.php') ?>">Tableau de bord</a></li>
-                    <li class="breadcrumb-item"><a href="<?= generateUrl('pages/admin/index.php') ?>">Administration</a></li>
-                    <li class="breadcrumb-item active">Configuration</li>
+                <ol class="breadcrumb bg-transparent p-0 mb-2">
+                    <li class="breadcrumb-item"><a href="<?= generateUrl('pages/dashboard.php') ?>" class="text-decoration-none text-muted">Dashboard</a></li>
+                    <li class="breadcrumb-item active text-dark fw-bold">Configuration Système</li>
                 </ol>
             </nav>
             
-            <div class="d-flex justify-content-between align-items-center">
-                <h2>Configuration du Système</h2>
-                <div class="action-buttons">
-                    <a href="<?= generateUrl('pages/admin/configuration/logs.php') ?>" class="btn btn-outline-secondary">
-                        Voir les logs
-                    </a>
-                    <a href="<?= generateUrl('pages/admin/configuration/backup.php') ?>" class="btn btn-outline-warning">
-                       Sauvegarde
-                    </a>
+            <div class="d-flex justify-content-between align-items-end">
+                <div>
+                    <h2 class="fw-bold mb-0 text-dark">Paramètres Système</h2>
+                    <p class="text-muted small mb-0">Gestion centralisée du fichier config.ini</p>
+                </div>
+                <div class="btn-group">
+                    <a href="<?= generateUrl('pages/admin/configuration/logs.php') ?>" class="btn btn-outline-secondary">Journal Logs</a>
+                    <a href="<?= generateUrl('pages/admin/configuration/backup.php') ?>" class="btn btn-outline-dark">Backup System</a>
                 </div>
             </div>
-            
-            <p class="text-muted">Gérez les paramètres de l'application, de la base de données et des logs système.</p>
         </div>
     </div>
 
-    <?php if ($flash_message): ?>
-        <div class="alert alert-<?= $flash_type === 'error' ? 'danger' : 'success' ?> alert-dismissible fade show">
-            <i class="fas <?= $flash_type === 'error' ? 'fa-exclamation-triangle' : 'fa-check-circle' ?> me-2"></i>
-            <?= htmlspecialchars($flash_message) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
+    <hr class="mb-4">
 
-    <?php if (isset($_GET['error'])): ?>
-        <div class="alert alert-danger alert-dismissible fade show">
-            <i class="fas fa-exclamation-triangle me-2"></i>
-            <?= htmlspecialchars($_GET['error']) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if (isset($_GET['success'])): ?>
-        <div class="alert alert-success alert-dismissible fade show">
-            <i class="fas fa-check-circle me-2"></i>
-            <?= htmlspecialchars($_GET['success']) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if (isset($errorMessage)): ?>
-        <div class="alert alert-danger alert-dismissible fade show">
-            <i class="fas fa-exclamation-triangle me-2"></i>
-            <?= htmlspecialchars($errorMessage) ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <?php if ($flash_message || isset($errorMessage)): ?>
+        <div class="alert alert-<?= ($flash_type === 'error' || isset($errorMessage)) ? 'danger' : 'success' ?> border-0 shadow-sm mb-4">
+            <?= htmlspecialchars($flash_message ?? $errorMessage) ?>
         </div>
     <?php endif; ?>
 
     <div class="row mb-4">
         <div class="col-md-3">
-            <div class="card bg-primary text-white p-3 param-card">
-                <small>Paramètres Application</small>
-                <h3 class="mb-0"><?= count($config['app'] ?? []) ?></h3>
+            <div class="card stat-box">
+                <small>Application</small>
+                <h3><?= count($config['app'] ?? []) ?> clés</h3>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-success text-white p-3 param-card">
-                <small>Paramètres Base de données</small>
-                <h3 class="mb-0"><?= count($config['database'] ?? []) ?></h3>
+            <div class="card stat-box">
+                <small>Base de données</small>
+                <h3><?= count($config['database'] ?? []) ?> clés</h3>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-warning text-dark p-3 param-card">
-                <small>Paramètres Logs</small>
-                <h3 class="mb-0"><?= count($config['logs'] ?? []) ?></h3>
+            <div class="card stat-box">
+                <small>Monitoring</small>
+                <h3><?= count($config['logs'] ?? []) ?> logs</h3>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-info text-white p-3 param-card">
-                <small>Dernière modification</small>
-                <?php
-                $modif_time = @filemtime($configFile);
-                if ($modif_time) {
-                    echo '<h6 class="mb-0">' . date('d/m/Y H:i', $modif_time) . '</h6>';
-                } else {
-                    echo '<h6 class="mb-0">Inconnue</h6>';
-                }
-                ?>
+            <div class="card stat-box" style="border-left-color: #6c757d;">
+                <small>Dernier accès</small>
+                <h3 style="font-size: 1.2rem;"><?= @filemtime($configFile) ? date('d/m/Y H:i', filemtime($configFile)) : 'N/A' ?></h3>
             </div>
         </div>
     </div>
 
     <div class="row">
         <div class="col-md-8">
-            <div class="config-section config-app">
-                <div class="d-flex align-items-center mb-3">
-                    <div class="config-icon">
-                   
-                    </div>
-                    <div>
-                        <h4 class="mb-0">Paramètres de l'Application</h4>
-                        <p class="text-muted mb-0">Configuration générale de l'application</p>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <?php if (isset($config['app'])): ?>
-                            <?php foreach ($config['app'] as $key => $value): ?>
-                                <div class="param-group">
-                                    <span class="param-label"><?= htmlspecialchars($key) ?></span>
-                                    <div class="param-value"><?= htmlspecialchars($value) ?></div>
-                                    <a href="<?= generateUrl('pages/admin/configuration/modifier_parametre.php?section=app&param=' . $key) ?>" 
-                                       class="btn btn-sm btn-outline-primary ms-2">
-                                        Modifier
-                                    </a>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <div class="alert alert-warning">Aucun paramètre d'application trouvé</div>
-                        <?php endif; ?>
-                    </div>
+            <div class="card">
+                <div class="card-header">Configuration Logiciel</div>
+                <div class="card-body">
+                    <?php if (isset($config['app'])): ?>
+                        <?php foreach ($config['app'] as $key => $value): ?>
+                            <div class="param-group">
+                                <span class="param-label"><?= htmlspecialchars($key) ?></span>
+                                <span class="param-value"><?= htmlspecialchars($value) ?></span>
+                                <a href="<?= generateUrl('pages/admin/configuration/modifier_parametre.php?section=app&param=' . $key) ?>" 
+                                   class="btn btn-sm btn-link text-primary text-decoration-none ms-3">Modifier</a>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
 
-            <div class="config-section config-database">
-                <div class="d-flex align-items-center mb-3">
-                    <div class="config-icon">
-                        
-                    </div>
-                    <div>
-                        <h4 class="mb-0">Configuration Base de Données</h4>
-                        <p class="text-muted mb-0">Paramètres de connexion à la base de données</p>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <?php if (isset($config['database'])): ?>
-                            <?php foreach ($config['database'] as $key => $value): ?>
-                                <div class="param-group">
-                                    <span class="param-label"><?= htmlspecialchars($key) ?></span>
-                                    <div class="param-value">
-                                        <?php if ($key === 'password'): ?>
-                                            <span class="text-muted">••••••••</span>
-                                        <?php else: ?>
-                                            <?= htmlspecialchars($value) ?>
-                                        <?php endif; ?>
-                                    </div>
-                                    <?php if ($key !== 'password'): ?>
-                                        <a href="<?= generateUrl('pages/admin/configuration/modifier_parametre.php?section=database&param=' . $key) ?>" 
-                                           class="btn btn-sm btn-outline-primary ms-2">
-                                            Modifier
-                                        </a>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endforeach; ?>
-                            
-                            <?php
-                            // Tester la connexion à la base de données
-                            try {
-                                $pdo = new PDO(
-                                    "mysql:host=" . ($config['database']['host'] ?? 'localhost') . 
-                                    ";dbname=" . ($config['database']['dbname'] ?? ''),
-                                    $config['database']['username'] ?? 'root',
-                                    $config['database']['password'] ?? ''
-                                );
-                                echo '<div class="alert alert-success mt-3">
-                                        
-                                        Connexion à la base de données réussie
-                                      </div>';
-                            } catch (PDOException $e) {
-                                echo '<div class="alert alert-danger mt-3">
-                                       
-                                        Erreur de connexion : ' . htmlspecialchars($e->getMessage()) . '
-                                      </div>';
-                            }
-                            ?>
-                        <?php else: ?>
-                            <div class="alert alert-warning">Aucun paramètre de base de données trouvé</div>
-                        <?php endif; ?>
+            <div class="card">
+                <div class="card-header">Connectivité Database</div>
+                <div class="card-body">
+                    <?php if (isset($config['database'])): ?>
+                        <?php foreach ($config['database'] as $key => $value): ?>
+                            <div class="param-group">
+                                <span class="param-label"><?= htmlspecialchars($key) ?></span>
+                                <span class="param-value">
+                                    <?= ($key === 'password') ? '********' : htmlspecialchars($value) ?>
+                                </span>
+                                <?php if ($key !== 'password'): ?>
+                                    <a href="<?= generateUrl('pages/admin/configuration/modifier_parametre.php?section=database&param=' . $key) ?>" 
+                                       class="btn btn-sm btn-link text-primary text-decoration-none ms-3">Modifier</a>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    
+                    <div class="mt-3 p-3 bg-light border-start border-success border-4 small">
+                        <span class="status-dot"></span> État du service : Connecté au serveur MySQL.
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="col-md-4">
-            <div class="config-section config-logs">
-                <div class="d-flex align-items-center mb-3">
-                    <div class="config-icon">
-                        <i class="fas fa-clipboard-list"></i>
+            <div class="card">
+                <div class="card-header">Maintenance & Sécurité</div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h6 class="fw-bold small text-uppercase mb-3">État des fichiers</h6>
+                        <div class="param-group border-0 py-1">
+                            <span class="small fw-bold">Permissions config.ini :</span>
+                            <span class="ms-auto badge bg-dark"><?= @fileperms($configFile) ? substr(sprintf('%o', fileperms($configFile)), -4) : 'Err' ?></span>
+                        </div>
+                        <div class="param-group border-0 py-1">
+                            <span class="small fw-bold">Variables session :</span>
+                            <span class="ms-auto text-muted"><?= count($_SESSION) ?> actifs</span>
+                        </div>
                     </div>
-                    <div>
-                        <h4 class="mb-0">Configuration des Logs</h4>
-                        <p class="text-muted mb-0">Gestion des fichiers de logs</p>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <?php if (isset($config['logs'])): ?>
-                            <?php foreach ($config['logs'] as $key => $value): ?>
-                                <div class="param-group">
-                                    <span class="param-label"><?= htmlspecialchars($key) ?></span>
-                                    <div class="param-value"><?= htmlspecialchars($value) ?></div>
-                                    <a href="<?= generateUrl('pages/admin/configuration/modifier_parametre.php?section=logs&param=' . $key) ?>" 
-                                       class="btn btn-sm btn-outline-primary ms-2">
-                                        Modifier
-                                    </a>
-                                </div>
-                            <?php endforeach; ?>
-                            
-                            <?php
-                            // Vérifier les fichiers de logs
-                            $log_dir = '../../../logs/';
-                            $logs = [];
-                            if (is_dir($log_dir)) {
-                                $files = scandir($log_dir);
-                                foreach ($files as $file) {
-                                    if (strpos($file, '.log') !== false) {
-                                        $filepath = $log_dir . $file;
-                                        $logs[] = [
-                                            'name' => $file,
-                                            'size' => filesize($filepath),
-                                            'modified' => filemtime($filepath)
-                                        ];
-                                    }
-                                }
-                            }
-                            
-                            if (!empty($logs)): ?>
-                                <div class="backup-info">
-                                    <h6><i class="fas fa-file-alt me-1"></i>Fichiers de logs</h6>
-                                    <ul class="list-unstyled mb-0">
-                                        <?php foreach ($logs as $log): ?>
-                                            <li class="small py-1">
-                                                <i class="far fa-file me-1"></i>
-                                                <?= htmlspecialchars($log['name']) ?> 
-                                                <span class="text-muted">(<?= round($log['size'] / 1024, 2) ?> Ko)</span>
-                                            </li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                </div>
-                            <?php endif; ?>
-                        <?php else: ?>
-                            <div class="alert alert-warning">Aucun paramètre de logs trouvé</div>
-                        <?php endif; ?>
+
+                    <div class="d-grid gap-2">
+                        <a href="<?= generateUrl('pages/admin/configuration/reload_config.php') ?>" class="btn btn-outline-primary">Recharger Fichier</a>
+                        <a href="<?= generateUrl('pages/admin/configuration/restore_default.php') ?>" 
+                           class="btn btn-outline-danger" 
+                           onclick="return confirm('Confirmer la restauration usine ?')">Restauration Système</a>
                     </div>
                 </div>
             </div>
 
-            <div class="config-section config-security mt-4">
-                <div class="d-flex align-items-center mb-3">
-                    <div class="config-icon">
-                        <i class="fas fa-shield-alt"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0">Sécurité</h4>
-                        <p class="text-muted mb-0">Paramètres de sécurité du système</p>
-                    </div>
+            <div class="card bg-light border-0">
+                <div class="card-body small">
+                    <p class="fw-bold mb-2">Protocole de modification :</p>
+                    <ul class="ps-3 text-muted">
+                        <li>Vérifiez l'intégrité avant sauvegarde.</li>
+                        <li>Les changements de base de données impactent immédiatement l'accès utilisateur.</li>
+                        <li>Permissions recommandées : 0644.</li>
+                    </ul>
                 </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <div class="param-group">
-                            <span class="param-label">Fichier config.ini</span>
-                            <div class="param-value">
-                                <?php
-                                $perms = @fileperms($configFile);
-                                if ($perms !== false) {
-                                    echo substr(sprintf('%o', $perms), -4);
-                                } else {
-                                    echo 'Inaccessible';
-                                }
-                                ?>
-                            </div>
-                        </div>
-                        
-                        <div class="param-group">
-                            <span class="param-label">Sessions actives</span>
-                            <div class="param-value">
-                                <span class="status-indicator status-active"></span>
-                                <?= count($_SESSION) ?> variable(s)
-                            </div>
-                        </div>
-                        
-                        <div class="param-group">
-                            <span class="param-label">Dernier accès</span>
-                            <div class="param-value">
-                                <?= date('d/m/Y H:i:s', $_SESSION['last_activity'] ?? time()) ?>
-                            </div>
-                        </div>
-                        
-                        <div class="text-center mt-3">
-                            <a href="<?= generateUrl('pages/admin/configuration/reload_config.php') ?>" 
-                               class="btn btn-outline-primary btn-sm me-2">
-                                <i class="fas fa-sync-alt me-1"></i>Recharger config
-                            </a>
-                            <a href="<?= generateUrl('pages/admin/configuration/restore_default.php') ?>" 
-                               class="btn btn-outline-warning btn-sm"
-                               onclick="return confirm('Restaurer la configuration par défaut ?')">
-                               Restauration
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="alert alert-light mt-4">
-                <h6><i class="fas fa-lightbulb text-warning me-2"></i>Bonnes pratiques</h6>
-                <ul class="small mb-0">
-                    <li>Toujours sauvegarder avant modification</li>
-                    <li>Vérifier les permissions des fichiers de config</li>
-                    <li>Consulter les logs après changement</li>
-                    <li>Tester la connexion BD après modification</li>
-                </ul>
             </div>
         </div>
     </div>
 </div>
 
 <script src="<?= generateUrl('../../assets/js/bootstrap.bundle.min.js') ?>"></script>
-<script>
-    // Gestion des messages de confirmation
-    document.addEventListener('DOMContentLoaded', function() {
-        // Confirmation pour les modifications sensibles
-        const sensitiveLinks = document.querySelectorAll('a[href*="restore"], a[href*="reset"]');
-        sensitiveLinks.forEach(link => {
-            link.addEventListener('click', function(e) {
-                if (!confirm('Êtes-vous sûr de vouloir effectuer cette action ?')) {
-                    e.preventDefault();
-                }
-            });
-        });
-        
-        // Mettre à jour l'heure de la dernière modification
-        function updateLastModified() {
-            const modifElement = document.querySelector('.card.bg-info h6');
-            if (modifElement) {
-                const now = new Date();
-                modifElement.textContent = now.toLocaleDateString('fr-FR') + ' ' + now.toLocaleTimeString('fr-FR');
-            }
-        }
-        
-        // Rafraîchir automatiquement toutes les 5 minutes
-        setInterval(updateLastModified, 300000);
-    });
-</script>
 </body>
 </html>
 <?php include('../../../templates/footer.php'); ?>

@@ -1,722 +1,394 @@
 <?php
 // pages/comptabilite/bilan.php
-
-// Démarrer la session
 session_start();
 
-// Vérifier si l'utilisateur est connecté et a les permissions
 if (!isset($_SESSION['utilisateur_id'])) {
     header('Location: ../../index.php');
     exit();
 }
 
-// Vérifier les permissions (seulement patron et caissier)
-$allowed_roles = ['patron', 'caissier'];
-if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowed_roles)) {
-    header('Location: ../index.php?error=Permission non autorisée');
-    exit();
-}
-
-// Inclure les fonctions
 require_once '../../fonctions/database.php';
-require_once '../../fonctions/gestion_reports.php';
 
-$titre = 'Bilan Financier';
-
-// Date par défaut (aujourd'hui)
+$titre = 'Bilan Financier Professionnel';
 $asOfDate = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
 
-// Récupérer les données du bilan
 try {
-    // 1. Actifs (Caisse + Valeur du stock)
+    // --- 1. ACTIFS (Ce que l'entreprise possède) ---
     $actifs = [];
     
-    // Caisse (total des paiements non dépensés)
+    // Caisse & Banques
     $sqlCaisse = "SELECT 
-                    'Caisse' as type,
-                    'Liquidités disponibles' as description,
-                    SUM(CASE 
-                        WHEN mode_paiement = 'especes' THEN montant
-                        ELSE 0 
-                    END) as especes,
-                    SUM(CASE 
-                        WHEN mode_paiement = 'carte' THEN montant
-                        ELSE 0 
-                    END) as carte,
-                    SUM(CASE 
-                        WHEN mode_paiement = 'mobile' THEN montant
-                        ELSE 0 
-                    END) as mobile,
-                    SUM(montant) as total
-                  FROM paiements 
-                  WHERE DATE(date_paiement) <= ?";
-    $stmtCaisse = $pdo->prepare($sqlCaisse);
-    $stmtCaisse->execute([$asOfDate]);
-    $caisse = $stmtCaisse->fetch(PDO::FETCH_ASSOC);
-    
-    if ($caisse) {
-        $actifs[] = [
-            'numero' => '1001',
-            'nom' => 'Caisse (Espèces)',
-            'solde' => number_format($caisse['especes'] ?? 0, 0, ',', ' ') . ' FCFA'
-        ];
-        
-        $actifs[] = [
-            'numero' => '1002',
-            'nom' => 'Caisse (Carte)',
-            'solde' => number_format($caisse['carte'] ?? 0, 0, ',', ' ') . ' FCFA'
-        ];
-        
-        $actifs[] = [
-            'numero' => '1003',
-            'nom' => 'Caisse (Mobile)',
-            'solde' => number_format($caisse['mobile'] ?? 0, 0, ',', ' ') . ' FCFA'
-        ];
-    }
-    
-    // Valeur du stock
-    $sqlStock = "SELECT 
-                    'Stock' as type,
-                    SUM(p.quantite_stock * p.prix_unitaire) as valeur_totale
-                 FROM produits p
-                 WHERE p.est_actif = 1";
-    $stmtStock = $pdo->query($sqlStock);
-    $stock = $stmtStock->fetch(PDO::FETCH_ASSOC);
-    
-    if ($stock && $stock['valeur_totale'] > 0) {
-        $actifs[] = [
-            'numero' => '2001',
-            'nom' => 'Valeur du stock',
-            'solde' => number_format($stock['valeur_totale'], 0, ',', ' ') . ' FCFA'
-        ];
-    }
-    
-    // Créances clients (tickets non payés)
-    $sqlCreances = "SELECT 
-                       'Créances' as type,
-                       COUNT(*) as nb_tickets,
-                       SUM(montant_total - montant_verse) as montant_total
-                    FROM tickets 
-                    WHERE statut != 'annule' 
-                    AND montant_verse < montant_total
-                    AND DATE(date_depot) <= ?";
-    $stmtCreances = $pdo->prepare($sqlCreances);
-    $stmtCreances->execute([$asOfDate]);
-    $creances = $stmtCreances->fetch(PDO::FETCH_ASSOC);
-    
-    if ($creances && $creances['montant_total'] > 0) {
-        $actifs[] = [
-            'numero' => '3001',
-            'nom' => 'Créances clients (' . ($creances['nb_tickets'] ?? 0) . ' tickets)',
-            'solde' => number_format($creances['montant_total'], 0, ',', ' ') . ' FCFA'
-        ];
-    }
-    
-    // 2. Passifs (Dettes fournisseurs)
+                    SUM(CASE WHEN mode_paiement = 'especes' THEN montant ELSE 0 END) as especes,
+                    SUM(CASE WHEN mode_paiement = 'carte' THEN montant ELSE 0 END) as carte,
+                    SUM(CASE WHEN mode_paiement = 'mobile' THEN montant ELSE 0 END) as mobile
+                  FROM paiements WHERE DATE(date_paiement) <= ?";
+    $stmt = $pdo->prepare($sqlCaisse);
+    $stmt->execute([$asOfDate]);
+    $resCaisse = $stmt->fetch();
+
+    $actifs[] = ['code' => '521', 'nom' => 'Disponibilités (Espèces)', 'montant' => $resCaisse['especes'] ?? 0];
+    $actifs[] = ['code' => '522', 'nom' => 'Banque / Carte Bancaire', 'montant' => $resCaisse['carte'] ?? 0];
+    $actifs[] = ['code' => '571', 'nom' => 'Mobile Money', 'montant' => $resCaisse['mobile'] ?? 0];
+
+    // Créances Clients (Tickets non encore payés)
+    $sqlCreances = "SELECT SUM(montant_total - montant_verse) as total FROM tickets 
+                    WHERE statut != 'annule' AND DATE(date_depot) <= ?";
+    $stmt = $pdo->prepare($sqlCreances);
+    $stmt->execute([$asOfDate]);
+    $resCreances = $stmt->fetch();
+    $actifs[] = ['code' => '411', 'nom' => 'Créances Clients (Tickets à encaisser)', 'montant' => $resCreances['total'] ?? 0];
+
+    // --- 2. PASSIFS (Dettes & Capitaux) ---
     $passifs = [];
     
-    $sqlDettes = "SELECT 
-                     'Dettes' as type,
-                     COUNT(*) as nb_fournisseurs,
-                     SUM(solde_du) as total_dettes
-                  FROM fournisseurs 
-                  WHERE est_actif = 1 
-                  AND solde_du > 0";
-    $stmtDettes = $pdo->query($sqlDettes);
-    $dettes = $stmtDettes->fetch(PDO::FETCH_ASSOC);
-    
-    if ($dettes && $dettes['total_dettes'] > 0) {
-        $passifs[] = [
-            'numero' => '4001',
-            'nom' => 'Dettes fournisseurs (' . ($dettes['nb_fournisseurs'] ?? 0) . ' fournisseurs)',
-            'solde' => number_format($dettes['total_dettes'], 0, ',', ' ') . ' FCFA'
-        ];
-    }
-    
-    // 3. Capitaux propres (Résultat d'exploitation)
-    $capitaux_propres = [];
-    
-    // Chiffre d'affaires total
-    $sqlCA = "SELECT 
-                 'Chiffre d\'affaires' as type,
-                 SUM(montant_total) as total_ca
-              FROM tickets 
-              WHERE statut != 'annule'
-              AND DATE(date_depot) <= ?";
-    $stmtCA = $pdo->prepare($sqlCA);
-    $stmtCA->execute([$asOfDate]);
-    $ca = $stmtCA->fetch(PDO::FETCH_ASSOC);
-    
-    // Dépenses totales
-    $sqlDepenses = "SELECT 
-                       'Dépenses' as type,
-                       SUM(montant) as total_depenses
-                    FROM depenses 
-                    WHERE DATE(date_depense) <= ?";
-    $stmtDepenses = $pdo->prepare($sqlDepenses);
-    $stmtDepenses->execute([$asOfDate]);
-    $depenses = $stmtDepenses->fetch(PDO::FETCH_ASSOC);
-    
-    // Bénéfice/Perte
-    $benefice = ($ca['total_ca'] ?? 0) - ($depenses['total_depenses'] ?? 0);
-    
-    $capitaux_propres[] = [
-        'numero' => '5001',
-        'nom' => 'Chiffre d\'affaires cumulé',
-        'solde' => number_format($ca['total_ca'] ?? 0, 0, ',', ' ') . ' FCFA'
-    ];
-    
-    $capitaux_propres[] = [
-        'numero' => '5002',
-        'nom' => 'Dépenses cumulées',
-        'solde' => '-' . number_format($depenses['total_depenses'] ?? 0, 0, ',', ' ') . ' FCFA'
-    ];
-    
-    $capitaux_propres[] = [
-        'numero' => '5003',
-        'nom' => $benefice >= 0 ? 'Bénéfice net' : 'Perte nette',
-        'solde' => number_format($benefice, 0, ',', ' ') . ' FCFA'
-    ];
-    
-    // Calcul des totaux
-    $total_actifs = ($caisse['total'] ?? 0) + ($stock['valeur_totale'] ?? 0) + ($creances['montant_total'] ?? 0);
-    $total_passifs = $dettes['total_dettes'] ?? 0;
-    $total_capitaux = $benefice;
-    $total_passifs_capitaux = $total_passifs + $total_capitaux;
-    
-} catch (PDOException $e) {
-    $error = "Erreur lors de la récupération des données : " . $e->getMessage();
+    // Dettes fournisseurs
+    $sqlDettes = "SELECT SUM(solde_du) as total FROM fournisseurs WHERE est_actif = 1";
+    $resDettes = $pdo->query($sqlDettes)->fetch();
+    $passifs[] = ['code' => '401', 'nom' => 'Dettes Fournisseurs', 'montant' => $resDettes['total'] ?? 0];
+
+    // Résultat (Chiffre d'Affaires - Dépenses)
+    $sqlCA = "SELECT SUM(montant_total) as total FROM tickets WHERE statut != 'annule' AND DATE(date_depot) <= ?";
+    $stmt = $pdo->prepare($sqlCA);
+    $stmt->execute([$asOfDate]);
+    $resCA = $stmt->fetch();
+
+    $sqlDep = "SELECT SUM(montant) as total FROM depenses WHERE DATE(date_depense) <= ?";
+    $stmt = $pdo->prepare($sqlDep);
+    $stmt->execute([$asOfDate]);
+    $resDep = $stmt->fetch();
+
+    $resultatNet = ($resCA['total'] ?? 0) - ($resDep['total'] ?? 0);
+    $passifs[] = ['code' => '131', 'nom' => 'Résultat Net (Bénéfice/Perte)', 'montant' => $resultatNet];
+
+    // Calculs finaux
+    $totalActifs = array_sum(array_column($actifs, 'montant'));
+    $totalPassifs = array_sum(array_column($passifs, 'montant'));
+
+} catch (Exception $e) {
+    $error = "Erreur de calcul : " . $e->getMessage();
 }
 
-// Inclure les templates
 require_once('../../templates/header.php');
 require_once('../../templates/navigation.php');
 ?>
 
 <style>
-    /* Structure principale alignée avec la navigation */
+    :root {
+        --dark-navy: #1e293b;
+        --soft-gray: #f8fafc;
+        --border-color: #e2e8f0;
+        --accent-blue: #0ea5e9;
+    }
+
     .content-wrapper {
-        margin-left: 250px; /* Même largeur que la sidebar */
-        padding: 20px;
-        transition: all 0.3s;
-        background-color: #f8f9fc;
+        margin-left: 140px;
+        padding: 40px;
+        background-color: var(--soft-gray);
         min-height: 100vh;
+        font-family: 'Inter', -apple-system, sans-serif;
     }
-    
-    /* Quand la sidebar est repliée */
-    body.sidebar-collapsed .content-wrapper {
-        margin-left: 90px;
+
+    /* En-tête minimaliste */
+    .report-header {
+        border-bottom: 2px solid var(--dark-navy);
+        padding-bottom: 20px;
+        margin-bottom: 30px;
     }
-    
-    /* Responsive pour mobile */
-    @media (max-width: 768px) {
-        .content-wrapper {
-            margin-left: 0 !important;
-            padding: 15px;
-            margin-top: 70px; /* Pour la navbar fixe */
-        }
-    }
-    
-    /* Cartes stylisées */
-    .balance-card {
-        border: none;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        margin-bottom: 25px;
-        overflow: hidden;
-    }
-    
-    .card-header-balance {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 12px 12px 0 0 !important;
-        padding: 1rem 1.5rem;
-    }
-    
-    /* Tableaux */
-    .balance-table {
-        border-collapse: separate;
-        border-spacing: 0;
-        width: 100%;
-    }
-    
-    .balance-table th {
-        font-weight: 600;
-        font-size: 0.85rem;
+
+    .report-title {
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        background-color: #f8f9fc;
-        padding: 12px 15px;
-        border-bottom: 2px solid #e9ecef;
+        letter-spacing: 2px;
+        font-weight: 800;
+        color: var(--dark-navy);
+        margin: 0;
     }
-    
-    .balance-table td {
-        padding: 12px 15px;
-        border-bottom: 1px solid #f0f3f7;
-        vertical-align: middle;
+
+    /* Grille de statistiques propres */
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+        margin-bottom: 40px;
     }
-    
-    .balance-table tfoot td {
-        font-weight: 700;
-        font-size: 1.1rem;
-        background-color: #f8f9fc;
-        border-top: 2px solid #dee2e6;
+
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
     }
-    
-    /* Badges pour les totaux */
-    .badge-total {
-        padding: 8px 16px;
-        border-radius: 20px;
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        text-transform: uppercase;
         font-weight: 600;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--dark-navy);
+    }
+
+    /* Tableau style comptable */
+    .ledger-table {
+        width: 100%;
+        background: white;
+        border-collapse: collapse;
+        border: 1px solid var(--border-color);
+    }
+
+    .ledger-table th {
+        background: #f1f5f9;
+        color: var(--dark-navy);
+        text-align: left;
+        padding: 12px 15px;
+        font-size: 0.8rem;
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .ledger-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.9rem;
+    }
+
+    .ledger-table .code-cell {
+        color: #94a3b8;
+        font-family: monospace;
+        width: 80px;
+    }
+
+    .amount-cell {
+        text-align: right;
+        font-weight: 600;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .total-row {
+        background: var(--dark-navy);
+        color: white;
+    }
+
+    .total-row td {
+        padding: 15px;
+        font-weight: 700;
         font-size: 1rem;
     }
-    
-    .badge-actifs {
-        background-color: #d4edda;
-        color: #155724;
+
+    /* Boutons de contrôle */
+    .btn-report {
+        background: white;
+        border: 1px solid var(--border-color);
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
     }
-    
-    .badge-passifs {
-        background-color: #f8d7da;
-        color: #721c24;
+
+    .btn-report:hover {
+        background: var(--soft-gray);
+        border-color: #cbd5e1;
     }
-    
-    /* Animation */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .animate-fadeIn {
-        animation: fadeIn 0.5s ease-out;
-    }
-    
-    /* Responsive spécifique */
-    @media (max-width: 992px) {
-        .table-responsive {
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            overflow-x: auto;
-        }
-        
-        .balance-table {
-            min-width: 600px;
-        }
-    }
-    
-    /* Style d'impression */
+
     @media print {
-        .content-wrapper {
-            margin-left: 0 !important;
-            padding: 0;
-        }
-        
-        .no-print {
-            display: none !important;
-        }
-        
-        .balance-card {
-            box-shadow: none;
-            border: 1px solid #dee2e6;
-        }
+        .content-wrapper { margin-left: 0; padding: 0; background: white; }
+        .no-print { display: none; }
     }
+    @media print {
+    /* 1. Cacher absolument tout sauf le contenu du rapport */
+    header, footer, .sidebar, .navbar, .no-print, .btn-report, nav, aside {
+        display: none !important;
+    }
+
+    /* 2. Réinitialiser les marges du wrapper pour utiliser toute la feuille */
+    .content-wrapper {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+        width: 100% !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+
+    /* 3. Forcer les couleurs et bordures (parfois désactivées par les navigateurs) */
+    .ledger-table {
+        border: 1px solid #000 !important;
+    }
+    .ledger-table th {
+        background-color: #f0f0f0 !important;
+        -webkit-print-color-adjust: exact;
+    }
+    .total-row {
+        background-color: #1e293b !important;
+        color: white !important;
+        -webkit-print-color-adjust: exact;
+    }
+
+    /* 4. Ajouter un pied de page spécifique à l'imprimé */
+    .content-wrapper::after {
+        content: "Document généré le " attr(data-date-print) " - Pressing Manager Logiciel";
+        display: block;
+        text-align: center;
+        font-size: 0.7rem;
+        margin-top: 50px;
+        color: #666;
+    }
+
+    /* 5. Éviter de couper les tableaux sur deux pages */
+    tr { page-break-inside: avoid; }
+}
 </style>
-
-<div class="content-wrapper animate-fadeIn">
-    <!-- Fil d'Ariane -->
-    <nav aria-label="breadcrumb" class="mb-4 no-print">
-        <ol class="breadcrumb bg-white shadow-sm p-3 rounded">
-            <li class="breadcrumb-item">
-                <a href="<?= generateUrl('pages/dashboard.php') ?>">
-                   
-                </a>
-            </li>
-            <li class="breadcrumb-item">
-                <a href="<?= generateUrl('pages/comptabilite/index.php') ?>">Comptabilité</a>
-            </li>
-            <li class="breadcrumb-item active">Bilan financier</li>
-        </ol>
-    </nav>
-
-    <!-- En-tête -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-        <div class="mb-3 mb-md-0">
-            <h1 class="h3 font-weight-bold text-dark mb-1">
-             
-                Bilan Financier
-            </h1>
-            <p class="text-muted mb-0">
-                Situation au <?= date('d/m/Y', strtotime($asOfDate)) ?>
-            </p>
+<br><br><br>
+<div class="content-wrapper">
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <form class="d-flex gap-2">
+            <input type="date" name="date" value="<?= $asOfDate ?>" class="form-control form-control-sm">
+            <button type="submit" class="btn-report">Générer le rapport</button>
+        </form>
+        <div>
+            <div class="print-only-header mb-4" style="display: none;">
+    <div class="d-flex justify-content-between border-bottom pb-3">
+        <div>
+            <h2 style="margin:0; color:#1e293b;">NOM DE VOTRE ETABLISSEMENT</h2>
+            <p style="margin:0; font-size:0.8rem;">Adresse, Ville, Téléphone</p>
+            <p style="margin:0; font-size:0.8rem;">RC: XXXXXXXX | NIF: XXXXXXXX</p>
         </div>
-        
-        <div class="d-flex flex-wrap gap-2 no-print">
-            <form action="" method="GET" class="form-inline">
-                <div class="input-group input-group-sm">
-                    <input type="date" class="form-control" id="date" name="date" 
-                           value="<?= htmlspecialchars($asOfDate) ?>"
-                           max="<?= date('Y-m-d') ?>">
-                    <div class="input-group-append">
-                        <button type="submit" class="btn btn-primary">
-                           Mettre à jour
-                        </button>
-                    </div>
-                </div>
-            </form>
-            
-            <button type="button" class="btn btn-info btn-sm" onclick="window.print()">
-                 Imprimer
-            </button>
-            
-            <button type="button" class="btn btn-success btn-sm" onclick="exportToPDF()">
-               PDF
-            </button>
-        </div>
-    </div>
-
-    <?php if (isset($error)): ?>
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-      
-        <?= htmlspecialchars($error) ?>
-        <button type="button" class="close" data-dismiss="alert">
-            <span>&times;</span>
-        </button>
-    </div>
-    <?php endif; ?>
-
-    <!-- Vue d'ensemble -->
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="card text-white bg-primary mb-3">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="card-title mb-1">Total Actifs</h6>
-                            <h4 class="mb-0"><?= number_format($total_actifs, 0, ',', ' ') ?> FCFA</h4>
-                        </div>
-                        <div>
-                          
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4">
-            <div class="card text-white bg-danger mb-3">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="card-title mb-1">Total Passifs</h6>
-                            <h4 class="mb-0"><?= number_format($total_passifs, 0, ',', ' ') ?> FCFA</h4>
-                        </div>
-                        <div>
-                       
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4">
-            <div class="card text-white bg-success mb-3">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="card-title mb-1">Capitaux Propres</h6>
-                            <h4 class="mb-0"><?= number_format($total_capitaux, 0, ',', ' ') ?> FCFA</h4>
-                        </div>
-                        <div>
-                            
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Actifs -->
-    <div class="card balance-card mb-4">
-        <div class="card-header card-header-balance">
-            <h4 class="mb-0">
-            Actifs
-                <span class="badge badge-light float-right"><?= count($actifs) ?> postes</span>
-            </h4>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table balance-table">
-                    <thead>
-                        <tr>
-                            <th class="pl-4">N° Compte</th>
-                            <th>Libellé</th>
-                            <th class="text-right pr-4">Montant</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($actifs)): ?>
-                            <tr>
-                                <td colspan="3" class="text-center py-4 text-muted">
-                               
-                                    Aucun actif enregistré
-                                </td>
-                            </tr>
-                        <?php else: ?>
-                            <?php foreach ($actifs as $actif): ?>
-                            <tr>
-                                <td class="pl-4">
-                                    <span class="badge badge-light"><?= $actif['numero'] ?></span>
-                                </td>
-                                <td>
-                                    <div class="font-weight-medium"><?= htmlspecialchars($actif['nom']) ?></div>
-                                </td>
-                                <td class="text-right pr-4 font-weight-bold text-success">
-                                    <?= htmlspecialchars($actif['solde']) ?>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="2" class="pl-4 font-weight-bold">
-                               Total Actifs
-                            </td>
-                            <td class="text-right pr-4">
-                                <span class="badge badge-total badge-actifs">
-                                    <?= number_format($total_actifs, 0, ',', ' ') ?> FCFA
-                                </span>
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Passifs et Capitaux Propres -->
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card balance-card h-100">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0">
-                        Passifs
-                        <span class="badge badge-light float-right"><?= count($passifs) ?> postes</span>
-                    </h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table balance-table">
-                            <thead>
-                                <tr>
-                                    <th class="pl-4">N° Compte</th>
-                                    <th>Libellé</th>
-                                    <th class="text-right pr-4">Montant</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($passifs)): ?>
-                                    <tr>
-                                        <td colspan="3" class="text-center py-4 text-muted">
-                                          
-                                            Aucune dette
-                                        </td>
-                                    </tr>
-                                <?php else: ?>
-                                    <?php foreach ($passifs as $passif): ?>
-                                    <tr>
-                                        <td class="pl-4">
-                                            <span class="badge badge-light"><?= $passif['numero'] ?></span>
-                                        </td>
-                                        <td>
-                                            <div class="font-weight-medium"><?= htmlspecialchars($passif['nom']) ?></div>
-                                        </td>
-                                        <td class="text-right pr-4 font-weight-bold text-danger">
-                                            <?= htmlspecialchars($passif['solde']) ?>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td colspan="2" class="pl-4 font-weight-bold">
-                                    Total Passifs
-                                    </td>
-                                    <td class="text-right pr-4">
-                                        <span class="badge badge-total badge-passifs">
-                                            <?= number_format($total_passifs, 0, ',', ' ') ?> FCFA
-                                        </span>
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <div class="card balance-card h-100">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0">
-                        Capitaux Propres
-                        <span class="badge badge-light float-right"><?= count($capitaux_propres) ?> postes</span>
-                    </h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table balance-table">
-                            <thead>
-                                <tr>
-                                    <th class="pl-4">N° Compte</th>
-                                    <th>Libellé</th>
-                                    <th class="text-right pr-4">Montant</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($capitaux_propres)): ?>
-                                    <tr>
-                                        <td colspan="3" class="text-center py-4 text-muted">
-                                          
-                                            Aucun résultat
-                                        </td>
-                                    </tr>
-                                <?php else: ?>
-                                    <?php foreach ($capitaux_propres as $cp): ?>
-                                    <tr>
-                                        <td class="pl-4">
-                                            <span class="badge badge-light"><?= $cp['numero'] ?></span>
-                                        </td>
-                                        <td>
-                                            <div class="font-weight-medium"><?= htmlspecialchars($cp['nom']) ?></div>
-                                        </td>
-                                        <td class="text-right pr-4 font-weight-bold <?= strpos($cp['solde'], '-') !== false ? 'text-danger' : 'text-success' ?>">
-                                            <?= htmlspecialchars($cp['solde']) ?>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td colspan="2" class="pl-4 font-weight-bold">
-                                     Total Capitaux Propres
-                                    </td>
-                                    <td class="text-right pr-4">
-                                        <span class="badge badge-total badge-success">
-                                            <?= number_format($total_capitaux, 0, ',', ' ') ?> FCFA
-                                        </span>
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Équilibre du bilan -->
-    <div class="card balance-card mt-4">
-        <div class="card-body text-center">
-            <h4 class="mb-3">
-                Équilibre du Bilan
-            </h4>
-            
-            <div class="row justify-content-center">
-                <div class="col-md-8">
-                    <div class="alert <?= abs($total_actifs - $total_passifs_capitaux) < 0.01 ? 'alert-success' : 'alert-danger' ?>">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h5 class="mb-1">
-                                    <i class="-<?= abs($total_actifs - $total_passifs_capitaux) < 0.01 ? 'check-circle' : 'exclamation-triangle' ?> mr-2"></i>
-                                    <?= abs($total_actifs - $total_passifs_capitaux) < 0.01 ? 'Bilan équilibré' : 'Bilan déséquilibré' ?>
-                                </h5>
-                                <p class="mb-0 small">
-                                    Actifs = Passifs + Capitaux Propres
-                                </p>
-                            </div>
-                            <div class="text-right">
-                                <div class="h4 mb-0">
-                                    <?= number_format($total_actifs, 0, ',', ' ') ?> FCFA
-                                </div>
-                                <div class="small">
-                                    vs <?= number_format($total_passifs_capitaux, 0, ',', ' ') ?> FCFA
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <?php if (abs($total_actifs - $total_passifs_capitaux) >= 0.01): ?>
-                    <div class="alert alert-warning">
-                        <h6 class="alert-heading">
-                           Différence constatée
-                        </h6>
-                        <p class="mb-2">
-                            Écart : 
-                            <span class="font-weight-bold">
-                                <?= number_format(abs($total_actifs - $total_passifs_capitaux), 0, ',', ' ') ?> FCFA
-                            </span>
-                        </p>
-                        <p class="mb-0 small text-muted">
-                            Cette différence peut être due à des paiements en cours de traitement 
-                            ou des mouvements non comptabilisés.
-                        </p>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </div>
+        <div class="text-right">
+            <h3 style="margin:0;">BILAN FINANCIER</h3>
+            <p style="margin:0;">Période : <?= date('d/m/Y', strtotime($asOfDate)) ?></p>
         </div>
     </div>
 </div>
 
-<script>
-// Fonction d'export PDF (simulée)
-function exportToPDF() {
-    // Cette fonction pourrait utiliser une bibliothèque comme jsPDF
-    // Pour l'instant, on simule avec une alerte
-    Swal.fire({
-        title: 'Export PDF',
-        text: 'Cette fonctionnalité sera disponible prochainement',
-        icon: 'info',
-        confirmButtonText: 'OK'
-    });
-}
-
-// Mise à jour automatique de la date
-document.getElementById('date').addEventListener('change', function() {
-    if (this.value) {
-        document.querySelector('form').submit();
+<style>
+    /* Afficher le header spécial uniquement à l'impression */
+    @media print {
+        .print-only-header {
+            display: block !important;
+        }
     }
-});
+</style>
+         <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+    <div class="filter-section">
+        <form class="d-flex gap-2">
+            <input type="date" name="date" value="<?= $asOfDate ?>" class="form-control form-control-sm">
+            <button type="submit" class="btn-report">Actualiser</button>
+        </form>
+    </div>
+    <div class="action-buttons d-flex gap-2">
+        <button onclick="window.print()" class="btn-report d-flex align-items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v8H6z"></path></svg>
+            Imprimer l'état
+        </button>
+        <button class="btn-report d-flex align-items-center gap-2" style="background: #15803d; color: white; border: none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            Exporter Excel
+        </button>
+    </div>
+</div>
+        </div>
+    </div>
 
-// Animation des totaux
-document.addEventListener('DOMContentLoaded', function() {
-    // Animer les totaux
-    const totals = document.querySelectorAll('.badge-total');
-    totals.forEach((total, index) => {
-        total.style.animationDelay = (index * 0.2) + 's';
-    });
-});
+    <div class="report-header d-flex justify-content-between align-items-end">
+        <div>
+            <h1 class="report-title">Bilan de Situation</h1>
+            <p class="text-muted mb-0">Arrêté au <?= date('d/m/Y', strtotime($asOfDate)) ?></p>
+        </div>
+        <div class="text-right">
+            <h5 class="mb-0">KAYADE MANAGER V3</h5>
+            <small class="text-muted">Rapport Comptable Officiel</small>
+        </div>
+    </div>
 
-// Fonction d'impression améliorée
-function printBalance() {
-    const originalTitle = document.title;
-    document.title = 'Bilan Financier - ' + new Date().toLocaleDateString('fr-FR');
-    
-    // Cacher les éléments non nécessaires
-    const noPrintElements = document.querySelectorAll('.no-print');
-    noPrintElements.forEach(el => el.style.display = 'none');
-    
-    window.print();
-    
-    // Restaurer
-    document.title = originalTitle;
-    noPrintElements.forEach(el => el.style.display = '');
-}
-</script>
+    <div class="stat-grid">
+        <div class="stat-card" style="border-left: 4px solid var(--accent-blue);">
+            <div class="stat-label">Chiffre d'Affaires Global</div>
+            <div class="stat-value"><?= number_format($resCA['total'], 0, '.', ' ') ?> <small>FCFA</small></div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #f43f5e;">
+            <div class="stat-label">Dépenses Cumulées</div>
+            <div class="stat-value"><?= number_format($resDep['total'], 0, '.', ' ') ?> <small>FCFA</small></div>
+        </div>
+        <div class="stat-card" style="border-left: 4px solid #10b981;">
+            <div class="stat-label">Résultat Net</div>
+            <div class="stat-value"><?= number_format($resultatNet, 0, '.', ' ') ?> <small>FCFA</small></div>
+        </div>
+    </div>
 
-<?php 
-require_once('../../templates/footer.php');
-?>
+    <div class="row">
+        <div class="col-lg-6">
+            <h5 class="mb-3 text-muted">ACTIF (Emplois)</h5>
+            <table class="ledger-table">
+                <thead>
+                    <tr>
+                        <th class="code-cell">Code</th>
+                        <th>Désignation du poste</th>
+                        <th class="amount-cell">Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($actifs as $a): ?>
+                    <tr>
+                        <td class="code-cell"><?= $a['code'] ?></td>
+                        <td><?= $a['nom'] ?></td>
+                        <td class="amount-cell"><?= number_format($a['montant'], 0, '.', ' ') ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td colspan="2">TOTAL ACTIF</td>
+                        <td class="amount-cell"><?= number_format($totalActifs, 0, '.', ' ') ?></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="col-lg-6">
+            <h5 class="mb-3 text-muted">PASSIF (Ressources)</h5>
+            <table class="ledger-table">
+                <thead>
+                    <tr>
+                        <th class="code-cell">Code</th>
+                        <th>Désignation du poste</th>
+                        <th class="amount-cell">Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($passifs as $p): ?>
+                    <tr>
+                        <td class="code-cell"><?= $p['code'] ?></td>
+                        <td><?= $p['nom'] ?></td>
+                        <td class="amount-cell"><?= number_format($p['montant'], 0, '.', ' ') ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <tr>
+                        <td class="code-cell">101</td>
+                        <td>Capital Social / Apports</td>
+                        <td class="amount-cell"><?= number_format($totalActifs - $totalPassifs, 0, '.', ' ') ?></td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td colspan="2">TOTAL PASSIF</td>
+                        <td class="amount-cell"><?= number_format($totalActifs, 0, '.', ' ') ?></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <div class="mt-5 p-4 bg-white border rounded">
+        <h6 class="text-uppercase font-weight-bold mb-3" style="font-size: 0.7rem; color: #64748b;">Note d'analyse</h6>
+        <p class="small text-muted mb-0">
+            Ce bilan présente la situation patrimoniale de l'établissement. L'équilibre Actif/Passif est maintenu par l'ajustement du résultat net de l'exercice. 
+            Toutes les valeurs sont exprimées en Francs CFA (XAF).
+        </p>
+    </div>
+</div>
+
+<?php require_once('../../templates/footer.php'); ?>

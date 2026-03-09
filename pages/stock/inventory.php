@@ -42,7 +42,7 @@ require_once(__DIR__ . '/../../templates/navigation.php');
     }
 
     .inventory-container {
-        margin-left: 250px;
+        margin-left: 150px;
         padding: 30px;
         background-color: #f4f7f6;
         min-height: 100vh;

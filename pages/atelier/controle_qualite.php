@@ -81,7 +81,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 require_once  '../../templates/header.php';
 require_once  '../../templates/navigation.php';
 ?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title><?= htmlspecialchars($TITRE_PAGE) ?> | BailCompta 360</title>
+   
+    <link rel="stylesheet" href="../../css/select2.min.css">
+    <link rel="stylesheet" href="../../css/select2-bootstrap.min.css">
 
+</head>
+<body>
 <style>
     .quality-card { max-width: 800px; margin: 40px auto; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden; }
     .check-item { padding: 15px; border-bottom: 1px solid #eee; display: flex; align-items: center; transition: 0.2s; }
@@ -94,7 +104,7 @@ require_once  '../../templates/navigation.php';
     <div class="quality-card card border-0">
         <div class="card-header card-header-custom p-4">
             <div class="d-flex justify-content-between align-items-center">
-                <h3 class="mb-0 fw-bold"><i class="fas fa-search text-warning me-2"></i>Inspection Qualité</h3>
+                <h3 class="mb-0 fw-bold">Inspection Qualité</h3>
                 <span class="badge bg-primary fs-6">Ticket #<?= $ticket['numero_ticket'] ?></span>
             </div>
             <p class="mb-0 mt-2 opacity-75">Client : <?= htmlspecialchars($ticket['nom_client'] . ' ' . ($ticket['prenom_client'] ?? '')) ?></p>
@@ -129,16 +139,23 @@ require_once  '../../templates/navigation.php';
                 <div class="col-md-6 mb-3">
                     <label class="form-label fw-bold">Preuve Visuelle (Photo Après)</label>
                     <div class="input-group">
-                        <span class="input-group-text bg-white"><i class="fas fa-camera"></i></span>
+                        <span class="input-group-text bg-white"></span>
                         <input type="file" name="photo_apres" class="form-control" accept="image/*" capture="camera">
                     </div>
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label fw-bold">Décision Finale</label>
-                    <select name="etat_final" class="form-select border-primary fw-bold" required>
-                        <option value="conforme">✅ CONFORME - Prêt pour retrait</option>
-                        <option value="avec_reserve">❌ NON-CONFORME - Retour atelier</option>
-                    </select>
+                  
+    <select name="etat_final" 
+            id="etatFinalSelect" 
+            class="form-control select2-enable border-primary fw-bold" 
+            required>
+        
+        <option value="">-- Choisir l'état final --</option>
+        <option value="conforme">✅ CONFORME - Prêt pour retrait</option>
+        <option value="avec_reserve">❌ NON-CONFORME - Retour atelier</option>
+    </select>
+
                 </div>
             </div>
 
@@ -149,7 +166,7 @@ require_once  '../../templates/navigation.php';
 
             <div class="d-flex justify-content-between align-items-center pt-3 border-top">
                 <a href="suivi_production.php" class="text-decoration-none text-muted fw-bold">
-                    <i class="fas fa-arrow-left me-1"></i> Retour
+                   Retour
                 </a>
                 <button type="submit" class="btn btn-success btn-lg px-5 shadow">
                     Enregistrer l'inspection
@@ -158,5 +175,17 @@ require_once  '../../templates/navigation.php';
         </form>
     </div>
 </div>
-
+<script src="../../js/jquery.min.js"></script>
+<script src="../../js/bootstrap.min.js"></script>
+<script src="../../js/select2.min.js"></script>
+<script>
+    $(document).ready(function() {
+    $('#etatFinalSelect').select2({
+        theme: "bootstrap",
+        placeholder: "Sélectionner l'état...",
+        minimumResultsForSearch: Infinity, // Masque la barre de recherche (inutile pour 2 options)
+        width: '100%'
+    });
+});
+</script>
 <?php require_once  '../../templates/footer.php'; ?>

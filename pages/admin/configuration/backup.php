@@ -91,7 +91,7 @@ if (isset($_GET['delete'])) {
 include('../../../templates/header.php');
 include('../../../templates/navigation.php');
 ?>
-
+<br> <br> <br>
 <div class="configuration-container" style="margin-left: 230px; padding: 20px;">
     <div class="row mb-4">
         <div class="col-12">

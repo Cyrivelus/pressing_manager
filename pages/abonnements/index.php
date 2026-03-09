@@ -17,6 +17,8 @@ $query = "SELECT a.*, c.nom_client, c.prenom_client, c.telephone
           JOIN clients c ON a.id_client = c.id_client 
           ORDER BY a.date_fin ASC";
 $abonnements = $pdo->query($query)->fetchAll();
+require_once  '../../templates/header.php';
+require_once  '../../templates/navigation.php';
 ?>
 
 <!DOCTYPE html>
@@ -34,12 +36,12 @@ $abonnements = $pdo->query($query)->fetchAll();
     </style>
 </head>
 <body class="bg-light">
-
+<br> <br> <br>
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3">📦 Gestion des Abonnements Mensuels</h1>
         <a href="ajouter.php" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Nouvel Abonnement
+           + Nouvel Abonnement
         </a>
     </div>
 
@@ -129,3 +131,4 @@ function relancerClient(id) {
 
 </body>
 </html>
+<?php require_once  '../../templates/footer.php'; ?>

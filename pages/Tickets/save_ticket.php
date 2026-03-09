@@ -248,7 +248,7 @@ try {
         'montant_verse' => $montant_verse,
         'reste_a_payer' => $montant_total - $montant_verse,
         'message' => "Ticket créé avec succès: $numero_ticket",
-        'redirect' => "imprimer_ticket.php?id=$id_ticket"
+        'redirect' => "print.php?id=$id_ticket"
     ]);
 
 } catch (PDOException $e) {

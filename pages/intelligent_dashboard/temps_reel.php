@@ -54,7 +54,7 @@ require_once '../../templates/navigation.php';
     .bg-info-soft { background-color: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
     .bg-success-soft { background-color: rgba(25, 135, 84, 0.1); color: #198754; }
 </style>
-
+<br><br><br>
 <div class="container-fluid py-5">
     <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
         <div>
@@ -71,7 +71,7 @@ require_once '../../templates/navigation.php';
             <div class="card stat-card shadow-sm bg-primary text-white p-4">
                 <small class="text-uppercase opacity-75">Chiffre d'Affaires</small>
                 <h2 class="fw-bold m-0"><?= number_format($ca_jour, 0, ',', ' ') ?> <small class="fs-6">FCFA</small></h2>
-                <div class="mt-3 small"><i class="fas fa-chart-line"></i> Cumul des dépôts jour</div>
+                <div class="mt-3 small">Cumul des dépôts jour</div>
             </div>
         </div>
         <div class="col-md-3">
@@ -96,7 +96,7 @@ require_once '../../templates/navigation.php';
                 $retards = 2; 
                 ?>
                 <h2 class="fw-bold m-0"><?= $retards ?> <small class="fs-6">Actions</small></h2>
-                <div class="mt-3 small fw-bold text-danger"><i class="fas fa-clock"></i> Délais à surveiller</div>
+                <div class="mt-3 small fw-bold text-danger">Délais à surveiller</div>
             </div>
         </div>
     </div>
@@ -105,7 +105,7 @@ require_once '../../templates/navigation.php';
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm rounded-4">
                 <div class="card-header bg-white py-3 border-0">
-                    <h6 class="fw-bold mb-0 text-primary"><i class="fas fa-history me-2"></i>Dernières opérations enregistrées</h6>
+                    <h6 class="fw-bold mb-0 text-primary">Dernières opérations enregistrées</h6>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -163,7 +163,7 @@ require_once '../../templates/navigation.php';
             <div class="card border-0 shadow-sm p-4 rounded-4 bg-dark text-white">
                 <h6 class="fw-bold mb-3 text-warning">Rappel Entretien</h6>
                 <div class="d-flex align-items-center mb-2">
-                    <i class="fas fa-tools me-3 fa-2x opacity-50"></i>
+                    
                     <div>
                         <small class="d-block opacity-75">Machine N°2</small>
                         <span class="small">Nettoyage filtre requis dans 4h</span>

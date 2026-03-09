@@ -57,14 +57,31 @@ include '../../templates/navigation.php';
             <span class="label label-info" style="font-size: 1.2em;"><?= strtoupper($ticket['statut']) ?></span>
         </div>
         <div class="col-md-6 text-right">
-            <a href="print.php?id=<?= $id_ticket ?>" class="btn btn-default" target="_blank">
-                Imprimer Reçu
-            </a>
-            <a href="print_commerce.php?id=<?= $id_ticket ?>" class="btn btn-default" target="_blank">
-                Imprimer Commerce
-            </a>
-            <a href="list.php" class="btn btn-primary">Retour à la liste</a>
-        </div>
+    <?php 
+    // On récupère l'activité actuelle (par défaut 'pressing' si non définie)
+    $currentActivity = $_SESSION['user_activity'] ?? 'pressing'; 
+    ?>
+
+    <?php if ($currentActivity === 'pressing'): ?>
+        <a href="print.php?id=<?= $id_ticket ?>" class="btn btn-default" target="_blank">
+          Imprimer Reçu
+        </a>
+    <?php endif; ?>
+
+    <?php if ($currentActivity === 'commerce'): ?>
+        <a href="print_commerce.php?id=<?= $id_ticket ?>" class="btn btn-default" target="_blank">
+             Imprimer Commerce
+        </a>
+    <?php endif; ?>
+
+    <?php if ($currentActivity === 'hotel'): ?>
+        <a href="print_hotel.php?id=<?= $id_ticket ?>" class="btn btn-default" target="_blank">
+             Imprimer Hôtel
+        </a>
+    <?php endif; ?>
+
+    <a href="list.php" class="btn btn-primary">Retour à la liste</a>
+</div>
         
     </div>
 

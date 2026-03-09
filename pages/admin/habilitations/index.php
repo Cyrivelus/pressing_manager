@@ -5,15 +5,8 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
-// 1. Inclure d'abord le fichier qui contient generateUrl() et la configuration de base
-// Ajustez le chemin vers votre fichier de fonctions générales
 require_once(__DIR__ . '/../../../fonctions/database.php');
 require_once(__DIR__ . '/../../../fonctions/gestion_habilitations.php');
-
-/** * Note : Si generateUrl n'existe toujours pas dans vos fichiers fonctions, 
- * voici une version de secours pour éviter l'erreur fatale.
- */
-
 
 // Vérification des permissions
 $roleUtilisateur = $_SESSION['role'] ?? 'Réceptionniste';
@@ -32,8 +25,7 @@ $flash_message = $_SESSION['flash_message'] ?? null;
 $flash_type = $_SESSION['flash_type'] ?? null;
 unset($_SESSION['flash_message'], $_SESSION['flash_type']);
 
-// Configuration de la page
-$titre = "Gestion des Habilitations (Rôles)";
+$titre = "Gestion des Habilitations";
 
 include(__DIR__ . '/../../../templates/header.php');
 include(__DIR__ . '/../../../templates/navigation.php');
@@ -48,101 +40,134 @@ include(__DIR__ . '/../../../templates/navigation.php');
     <link rel="stylesheet" href="<?= generateUrl('../css/bootstrap.min.css') ?>">
     <link rel="stylesheet" href="<?= generateUrl('../css/all.min.css') ?>">
     <style>
-        .habilitations-container {
-            margin-left: 230px; /* Aligné avec votre index précédent */
-            padding: 20px;
-            transition: margin-left 0.3s ease;
+        :root {
+            --admin-primary: #2c3e50;
+            --admin-secondary: #6c757d;
+            --admin-border: #dee2e6;
+            --admin-bg: #f8f9fa;
         }
-        body.collapsed-sidebar .habilitations-container { margin-left: 70px; }
+
+        body { background-color: var(--admin-bg); color: #333; font-family: 'Inter', sans-serif; }
+
+        .habilitations-container {
+            margin-left: 130px;
+            padding: 30px;
+            transition: all 0.3s;
+        }
+        
+        /* Structure de carte professionnelle */
+        .card { border-radius: 4px; border: 1px solid var(--admin-border); background: #fff; box-shadow: none; margin-bottom: 20px; }
+        .card-header { background-color: #fff; border-bottom: 1px solid var(--admin-border); padding: 15px 20px; }
+        
+        /* Stats Cards épurées */
+        .stats-card { border-left: 4px solid var(--admin-primary); padding: 15px; background: #fff; }
+        .stats-card small { color: var(--admin-secondary); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        .stats-card h3 { color: var(--admin-primary); font-weight: 700; margin-top: 5px; }
+        .border-success { border-left-color: #28a745 !important; }
+        .border-warning { border-left-color: #ffc107 !important; }
+
+        /* Badges sobres */
+        .badge-permission { 
+            font-size: 0.8em; 
+            padding: 4px 12px; 
+            border-radius: 2px; 
+            background: #f1f3f5; 
+            color: var(--admin-primary); 
+            border: 1px solid #dee2e6;
+            font-weight: 500;
+        }
+        
+        .table thead th { 
+            background-color: #fcfcfc; 
+            text-transform: uppercase; 
+            font-size: 0.75rem; 
+            color: var(--admin-secondary);
+            border-bottom: 2px solid var(--admin-border);
+        }
+
+        .btn { border-radius: 2px; text-transform: uppercase; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.3px; }
+        .btn-primary { background-color: var(--admin-primary); border-color: var(--admin-primary); }
+        
+        .description-cell { max-width: 300px; color: var(--admin-secondary); font-size: 0.9rem; }
+        
+        /* Breadcrumb */
+        .breadcrumb { background: transparent; padding: 0; margin-bottom: 15px; }
+        .breadcrumb-item a { color: var(--admin-secondary); text-decoration: none; }
+
         @media (max-width: 992px) { .habilitations-container { margin-left: 0 !important; } }
-        
-        .card { border-radius: 10px; border: 1px solid #e0e0e0; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .badge-permission { font-size: 0.75em; padding: 5px 10px; border-radius: 20px; }
-        .permission-1 { background-color: #6c757d; color: white; }
-        .permission-2 { background-color: #28a745; color: white; }
-        .permission-3 { background-color: #ffc107; color: black; }
-        .permission-4 { background-color: #dc3545; color: white; }
-        .permission-5 { background-color: #6610f2; color: white; }
-        
-        .description-cell { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .stats-card { transition: transform 0.2s; border: none; }
-        .stats-card:hover { transform: translateY(-3px); }
     </style>
 </head>
 <body>
 
+<br> <br> <br>
 <div class="habilitations-container">
-    <div class="row mb-4">
-        <div class="col-12">
+    <div class="row align-items-center mb-4">
+        <div class="col-md-8">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="<?= generateUrl('pages/dashboard.php') ?>">Tableau de bord</a></li>
+                    <li class="breadcrumb-item"><a href="<?= generateUrl('pages/dashboard.php') ?>">Administration</a></li>
                     <li class="breadcrumb-item active">Habilitations</li>
                 </ol>
             </nav>
-            
-            <div class="d-flex justify-content-between align-items-center">
-                <h2><i class="fas fa-user-shield text-primary me-2"></i>Habilitations & Rôles</h2>
-                <div>
-                    <a href="<?= generateUrl('pages/admin/profils/ajouter.php') ?>" class="btn btn-primary">
-                        Nouveau Rôle
-                    </a>
-                </div>
-            </div>
+            <h2 class="fw-bold text-dark m-0">Gestion des Accès</h2>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+            <a href="<?= generateUrl('pages/admin/profils/ajouter.php') ?>" class="btn btn-primary px-4 shadow-sm">
+                Nouveau Rôle
+            </a>
         </div>
     </div>
 
     <?php if ($flash_message): ?>
-        <div class="alert alert-<?= $flash_type === 'error' ? 'danger' : 'success' ?> alert-dismissible fade show">
-            <i class="fas fa-info-circle me-2"></i><?= htmlspecialchars($flash_message) ?>
+        <div class="alert alert-<?= $flash_type === 'error' ? 'danger' : 'light' ?> border alert-dismissible fade show">
+            <?= htmlspecialchars($flash_message) ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
 
     <?php 
-    // On suppose que cette fonction existe dans vos fichiers inclus
     $stats = function_exists('getStatistiquesHabilitations') ? getStatistiquesHabilitations($pdo) : ['total_roles'=>0,'utilisateurs_avec_role'=>0,'utilisateurs_sans_role'=>0,'total_utilisateurs'=>0]; 
     ?>
-    <div class="row mb-4">
+    <div class="row mb-2">
         <div class="col-md-3">
-            <div class="card bg-primary text-white stats-card p-3">
+            <div class="card stats-card">
                 <small>Total Rôles</small>
                 <h3 class="mb-0"><?= $stats['total_roles'] ?></h3>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-success text-white stats-card p-3">
-                <small>Utilisateurs assignés</small>
+            <div class="card stats-card border-success">
+                <small>Assignés</small>
                 <h3 class="mb-0"><?= $stats['utilisateurs_avec_role'] ?></h3>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-warning text-dark stats-card p-3">
-                <small>Sans rôle</small>
+            <div class="card stats-card border-warning">
+                <small>Non-assignés</small>
                 <h3 class="mb-0"><?= $stats['utilisateurs_sans_role'] ?></h3>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-info text-white stats-card p-3">
+            <div class="card stats-card" style="border-left-color: #17a2b8;">
                 <small>Total Personnel</small>
                 <h3 class="mb-0"><?= $stats['total_utilisateurs'] ?></h3>
             </div>
         </div>
     </div>
 
-    <div class="card shadow-sm mb-5">
-        <div class="card-header bg-white">
-            <h5 class="mb-0">Profils de permissions</h5>
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="m-0 fw-bold">Profils de permissions</h5>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+                <thead>
                     <tr>
-                        <th>Nom du Rôle</th>
+                        <th class="ps-4">Nom du Rôle</th>
                         <th>Description</th>
                         <th>Niveau</th>
-                        <th>Membres</th>
-                        <th class="text-end">Actions</th>
+                        <th>Effectif</th>
+                        <th class="text-end pe-4">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -150,40 +175,22 @@ include(__DIR__ . '/../../../templates/navigation.php');
                         $niv = $role['niveau_permission'] ?? 1;
                     ?>
                     <tr>
-                        <td><strong><?= htmlspecialchars($role['Nom_Profil']) ?></strong></td>
-                        <td class="description-cell" title="<?= htmlspecialchars($role['description']) ?>">
-                            <?= htmlspecialchars($role['description']) ?>
-                        </td>
+                        <td class="ps-4"><strong><?= htmlspecialchars($role['Nom_Profil']) ?></strong></td>
+                        <td class="description-cell"><?= htmlspecialchars($role['description']) ?></td>
                         <td>
-                            <span class="badge badge-permission permission-<?= $niv ?>">Niveau <?= $niv ?></span>
+                            <span class="badge-permission">Niveau <?= $niv ?></span>
                         </td>
-                        <td><span class="badge bg-light text-dark"><?= $role['nombre_utilisateurs'] ?? 0 ?> membre(s)</span></td>
-                        <td class="text-end">
-                            <a href="<?= generateUrl('pages/admin/profils/modifier.php?id=' . $role['ID_Habilitation_Profil']) ?>" class="btn btn-sm btn-outline-primary">Modifier</a>
-                            <?php if (($role['nombre_utilisateurs'] ?? 0) == 0): ?>
-                                <a href="<?= generateUrl('pages/admin/profils/supprimer.php?id=' . $role['ID_Habilitation_Profil']) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Supprimer ce rôle ?')">Supprimer</a>
-                            <?php endif; ?>
-                            <td class="text-end">
-    <a href="<?= generateUrl('pages/admin/habilitations/afficher_details.php?id=' . $role['ID_Habilitation_Profil']) ?>" 
-       class="btn btn-sm btn-outline-info">
-       Afficher les détails
-    </a>
-    
-    <a href="<?= generateUrl('pages/admin/profils/modifier.php?id=' . $role['ID_Habilitation_Profil']) ?>" 
-       class="btn btn-sm btn-outline-primary">
-       
-    </a>
-
-    <?php if (($role['nombre_utilisateurs'] ?? 0) == 0): ?>
-        <a href="<?= generateUrl('pages/admin/profils/supprimer.php?id=' . $role['ID_Habilitation_Profil']) ?>" 
-           class="btn btn-sm btn-outline-danger" 
-           onclick="return confirm('Supprimer ce rôle ?')">
-           
-        </a>
-    <?php endif; ?>
-</td>
+                        <td><span class="text-muted small"><?= $role['nombre_utilisateurs'] ?? 0 ?> membre(s)</span></td>
+                        <td class="text-end pe-4">
+                            <div class="btn-group">
+                                <a href="<?= generateUrl('pages/admin/habilitations/afficher_details.php?id=' . $role['ID_Habilitation_Profil']) ?>" class="btn btn-sm btn-outline-secondary" title="Détails">Détails</a>
+                                <a href="<?= generateUrl('pages/admin/habilitations/attribuer.php?id=' . $role['ID_Habilitation_Profil']) ?>" class="btn btn-sm btn-outline-secondary">Assigner</a>
+                                <a href="<?= generateUrl('pages/admin/profils/modifier.php?id=' . $role['ID_Habilitation_Profil']) ?>" class="btn btn-sm btn-outline-primary">Modifier</a>
+                                <?php if (($role['nombre_utilisateurs'] ?? 0) == 0): ?>
+                                    <a href="<?= generateUrl('pages/admin/profils/supprimer.php?id=' . $role['ID_Habilitation_Profil']) ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Supprimer ce rôle ?')">Supprimer</a>
+                                <?php endif; ?>
+                            </div>
                         </td>
-                        
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -191,13 +198,12 @@ include(__DIR__ . '/../../../templates/navigation.php');
         </div>
     </div>
 
-    <div class="alert alert-light border shadow-sm">
-        <h6><i class="fas fa-lightbulb text-warning me-2"></i>Aide aux niveaux de permissions</h6>
-        <div class="row small">
-            <div class="col-md-4"><strong>Niv 1-2 :</strong> Personnel de production</div>
-            <div class="col-md-4"><strong>Niv 3 :</strong> Réception & Caisse</div>
-            <div class="col-md-4"><strong>Niv 4-5 :</strong> Direction & Admin</div>
-        </div>
+    <div class="alert alert-light border rounded-0 small text-muted">
+        
+        <strong>Légende :</strong> 
+        Niv 1-2 : Production | 
+        Niv 3 : Réception & Caisse | 
+        Niv 4-5 : Direction & Administration.
     </div>
 </div>
 

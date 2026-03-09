@@ -29,6 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = "<div class='alert alert-danger'>Erreur : " . $e->getMessage() . "</div>";
     }
 }
+require_once  '../../templates/header.php';
+require_once  '../../templates/navigation.php';
 ?>
 
 <!DOCTYPE html>
@@ -44,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </style>
 </head>
 <body class="bg-light">
-
+<br> <br> <br>
 <div class="container">
     <div class="form-container">
         <div class="d-flex align-items-center mb-4">
@@ -126,3 +128,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 </body>
 </html>
+<?php require_once  '../../templates/footer.php'; ?>

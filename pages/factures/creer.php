@@ -23,7 +23,7 @@ require_once  '../../templates/navigation.php';
             <div class="col-lg-8">
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-body">
-                        <h5 class="fw-bold mb-4 text-primary"><i class="fas fa-file-invoice me-2"></i>Détails de la Facture</h5>
+                        <h5 class="fw-bold mb-4 text-primary">Détails de la Facture</h5>
                         
                         <div class="row mb-4">
                             <div class="col-md-6">
@@ -69,13 +69,13 @@ require_once  '../../templates/navigation.php';
                                         <td><input type="number" name="prix[]" class="form-control input-prix" step="0.01" readonly></td>
                                         <td><input type="number" name="qte[]" class="form-control input-qte" value="1" min="1"></td>
                                         <td><input type="text" class="form-control input-total border-0 bg-light fw-bold" readonly value="0"></td>
-                                        <td><button type="button" class="btn btn-outline-danger btn-sm btn-remove"><i class="fas fa-times"></i></button></td>
+                                        <td><button type="button" class="btn btn-outline-danger btn-sm btn-remove">Retirer</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
                         <button type="button" id="addBtn" class="btn btn-outline-primary btn-sm mt-2">
-                            <i class="fas fa-plus me-1"></i> Ajouter une ligne
+                            +Ajouter une ligne
                         </button>
                     </div>
                 </div>
@@ -109,7 +109,7 @@ require_once  '../../templates/navigation.php';
                     </div>
 
                     <button type="submit" class="btn btn-primary w-100 py-3 fw-bold shadow">
-                        <i class="fas fa-save me-2"></i> VALIDER LA FACTURE
+                        VALIDER LA FACTURE
                     </button>
                 </div>
             </div>

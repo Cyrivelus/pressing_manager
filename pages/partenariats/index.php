@@ -46,7 +46,7 @@ require_once '../../templates/navigation.php';
 <div class="container-fluid py-5">
     <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
         <div>
-            <h2 class="fw-bold m-0 text-primary"><i class="fas fa-handshake me-2"></i><?= $titre ?></h2>
+            <h2 class="fw-bold m-0 text-primary"><?= $titre ?></h2>
             <p class="text-muted">Gérez vos relations entreprises, hôtels et apporteurs d'affaires.</p>
         </div>
     </div>
@@ -56,7 +56,7 @@ require_once '../../templates/navigation.php';
             <div class="card border-0 shadow-sm rounded-4 p-3 bg-white">
                 <div class="d-flex align-items-center">
                     <div class="bg-primary text-white p-3 rounded-3 me-3">
-                        <i class="fas fa-building fa-2x"></i>
+                       
                     </div>
                     <div>
                         <h6 class="text-muted mb-0 small fw-bold">ENTREPRISES</h6>
@@ -69,7 +69,7 @@ require_once '../../templates/navigation.php';
             <div class="card border-0 shadow-sm rounded-4 p-3 bg-white">
                 <div class="d-flex align-items-center">
                     <div class="bg-info text-white p-3 rounded-3 me-3">
-                        <i class="fas fa-hotel fa-2x"></i>
+                       
                     </div>
                     <div>
                         <h6 class="text-muted mb-0 small fw-bold">HÔTELLERIE</h6>
@@ -82,7 +82,7 @@ require_once '../../templates/navigation.php';
             <div class="card border-0 shadow-sm rounded-4 p-3 bg-dark text-white">
                 <div class="d-flex align-items-center">
                     <div class="bg-warning text-dark p-3 rounded-3 me-3">
-                        <i class="fas fa-percentage fa-2x"></i>
+                      
                     </div>
                     <div>
                         <h6 class="text-white-50 mb-0 small fw-bold">COMMISSIONS DUES</h6>
@@ -96,28 +96,28 @@ require_once '../../templates/navigation.php';
     <div class="row g-4 mb-5">
         <div class="col-md-3">
             <a href="entreprises.php" class="card border-0 shadow-sm rounded-4 text-center p-4 text-decoration-none hover-card">
-                <i class="fas fa-city fa-3x text-primary mb-3"></i>
+             
                 <h5 class="fw-bold text-dark">Entreprises</h5>
                 <p class="text-muted small">Gestion des comptes sociétés et facturation groupée.</p>
             </a>
         </div>
         <div class="col-md-3">
             <a href="hotellerie.php" class="card border-0 shadow-sm rounded-4 text-center p-4 text-decoration-none hover-card">
-                <i class="fas fa-bed fa-3x text-info mb-3"></i>
+              
                 <h5 class="fw-bold text-dark">Hôtellerie</h5>
                 <p class="text-muted small">Suivi des dépôts linges et conciergerie hôtels.</p>
             </a>
         </div>
         <div class="col-md-3">
             <a href="conventions.php" class="card border-0 shadow-sm rounded-4 text-center p-4 text-decoration-none hover-card">
-                <i class="fas fa-file-contract fa-3x text-success mb-3"></i>
+             
                 <h5 class="fw-bold text-dark">Conventions</h5>
                 <p class="text-muted small">Archives des contrats et tarifs préférentiels.</p>
             </a>
         </div>
         <div class="col-md-3">
             <a href="commissions.php" class="card border-0 shadow-sm rounded-4 text-center p-4 text-decoration-none hover-card">
-                <i class="fas fa-coins fa-3x text-warning mb-3"></i>
+             
                 <h5 class="fw-bold text-dark">Commissions</h5>
                 <p class="text-muted small">Calcul et versement des parts apporteurs.</p>
             </a>
@@ -148,7 +148,7 @@ require_once '../../templates/navigation.php';
                             <td><?= htmlspecialchars($p['telephone_client']) ?></td>
                             <td><?= date('d/m/Y', strtotime($p['date_creation'])) ?></td>
                             <td class="text-end pe-4">
-                                <button class="btn btn-sm btn-light border"><i class="fas fa-eye"></i></button>
+                                <button class="btn btn-sm btn-light border"></button>
                             </td>
                         </tr>
                         <?php endforeach; ?>

@@ -390,6 +390,11 @@ if (empty($_SESSION['csrf_token'])) {
                 padding: 25px 20px;
             }
         }
+        /* Style pour cacher le pot de miel aux humains */
+.honey-field {
+    display: none !important;
+    visibility: hidden;
+}
     </style>
 </head>
 <body>
@@ -446,43 +451,53 @@ if (empty($_SESSION['csrf_token'])) {
                 </a>
             </div>
         <?php else: ?>
-            <div class="card-body">
-                <form action="pages/authentification.php" method="POST" id="loginForm">
-                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                    
-                    <div class="form-group">
-                        <div class="input-icon user-icon">
-                            <input type="text" class="form-control" name="login" placeholder="<?= $text['username_placeholder'] ?>" required>
-                        </div>
-                    </div>
+        <div class="card-body">
+    <?php if (isset($_GET['error'])): ?>
+        <div style="background: #fee2e2; color: #dc2626; padding: 10px; border-radius: 6px; margin-bottom: 20px; font-size: 0.85rem; border: 1px solid #fca5a5; text-align: center;">
+            <?= htmlspecialchars($_GET['error']) ?>
+        </div>
+    <?php endif; ?>
 
-                    <div class="form-group">
-                        <div class="input-icon lock-icon">
-                            <input type="password" class="form-control" id="password" name="password" placeholder="<?= $text['password_placeholder'] ?>" required>
-                            <button type="button" class="password-toggle" onclick="togglePassword()">
-                                <?= $text['show_password'] ?>
-                            </button>
-                        </div>
-                    </div>
+    <form action="pages/authentification.php" method="POST" id="loginForm">
+        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+        
+        <div class="honey-field">
+            <input type="text" name="phone_home" value="" tabindex="-1" autocomplete="off">
+        </div>
 
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="rememberMe" name="rememberMe">
-                        <label for="rememberMe"><?= $text['remember_me'] ?></label>
-                    </div>
-
-                    <button type="submit" class="btn-login">
-                        <?= $text['login_button'] ?>
-                    </button>
-
-                    <button type="submit" name="guestLogin" class="btn-guest">
-                        <?= $text['guest_login'] ?>
-                    </button>
-
-                    <a href="forgot_password.php" class="forgot-link">
-                        <?= $text['forgot_password'] ?>
-                    </a>
-                </form>
+        <div class="form-group">
+            <div class="input-icon user-icon">
+                <input type="text" class="form-control" name="login" placeholder="<?= $text['username_placeholder'] ?>" required>
             </div>
+        </div>
+
+        <div class="form-group">
+            <div class="input-icon lock-icon">
+                <input type="password" class="form-control" id="password" name="password" placeholder="<?= $text['password_placeholder'] ?>" required>
+                <button type="button" class="password-toggle" onclick="togglePassword()">
+                    <?= $text['show_password'] ?>
+                </button>
+            </div>
+        </div>
+
+        <div class="checkbox-group">
+            <input type="checkbox" id="rememberMe" name="rememberMe">
+            <label for="rememberMe"><?= $text['remember_me'] ?></label>
+        </div>
+
+        <button type="submit" class="btn-login">
+            <?= $text['login_button'] ?>
+        </button>
+
+        <button type="submit" name="guestLogin" class="btn-guest">
+            <?= $text['guest_login'] ?>
+        </button>
+
+        <a href="forgot_password.php" class="forgot-link">
+            <?= $text['forgot_password'] ?>
+        </a>
+    </form>
+</div>
         <?php endif; ?>
     </div>
 

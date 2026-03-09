@@ -35,11 +35,11 @@ require_once   '../../templates/navigation.php';
 
     <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
         <div>
-            <h2 class="fw-bold m-0 text-success"><i class="fas fa-map-marked-alt me-2"></i><?= $titre ?></h2>
+            <h2 class="fw-bold m-0 text-success"><?= $titre ?></h2>
             <p class="text-muted">Suivi en direct de la flotte et performance des tournées</p>
         </div>
         <div class="badge bg-success-light text-success p-2 border border-success">
-            <i class="fas fa-satellite-dish fa-spin me-2"></i> Connexion Satellite Active
+             Connexion Satellite Active
         </div>
     </div>
 
@@ -68,7 +68,7 @@ require_once   '../../templates/navigation.php';
                         </div>
                         <div class="mt-3 d-grid">
                             <button class="btn btn-sm btn-success shadow-sm" onclick="focusLivreur(<?= $l['id_utilisateur'] ?>)">
-                                <i class="fas fa-crosshairs me-1"></i> Localiser le véhicule
+                                 Localiser le véhicule
                             </button>
                         </div>
                     </div>
@@ -76,7 +76,7 @@ require_once   '../../templates/navigation.php';
 
                     <?php if(empty($livreurs_actifs)): ?>
                         <div class="p-5 text-center">
-                            <i class="fas fa-truck-loading fa-3x text-light mb-3"></i>
+                           
                             <p class="text-muted small">Aucun livreur n'a de tournée active pour le moment.</p>
                         </div>
                     <?php endif; ?>
@@ -107,7 +107,7 @@ require_once   '../../templates/navigation.php';
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm h-100 overflow-hidden position-relative" style="min-height: 600px; border-radius: 15px;">
                 <div class="position-absolute top-0 end-0 m-3 p-2 bg-white shadow-sm rounded border fw-bold small" style="z-index: 10;">
-                    <i class="fas fa-circle text-success me-1"></i> Live : Douala, Cameroun
+                     Live : Yaoundé, Cameroun
                 </div>
 
                 <div id="map" style="height: 100%; min-height: 600px; background: #f8f9fa;" class="d-flex align-items-center justify-content-center">
@@ -121,11 +121,11 @@ require_once   '../../templates/navigation.php';
                 <div class="position-absolute bottom-0 start-0 m-3 p-3 bg-white shadow-lg rounded-4 border-start border-success border-5" style="max-width: 300px; z-index: 1000;">
                     <div class="d-flex align-items-center mb-2">
                         <div class="bg-success-light p-2 rounded me-2">
-                            <i class="fas fa-route text-success"></i>
+                            
                         </div>
                         <h6 class="fw-bold mb-0 small">Prochaine étape</h6>
                     </div>
-                    <p class="mb-1 fw-bold small">Mme. TCHAMENI (Bonapriso)</p>
+                    <p class="mb-1 fw-bold small">Mme. TCHAMENI (Superette)</p>
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="badge bg-light text-dark border">Ticket #4529</span>
                         <span class="text-success small fw-bold">~ 8 min</span>

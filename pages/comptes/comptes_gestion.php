@@ -41,19 +41,19 @@ require_once '../../templates/navigation.php';
 <div class="container-fluid py-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="fw-bold m-0 text-primary"><i class="fas fa-university me-2"></i><?= $titre ?></h2>
+            <h2 class="fw-bold m-0 text-primary"><?= $titre ?></h2>
             <p class="text-muted">Suivi des flux monétaires en temps réel</p>
         </div>
         <div>
             <button class="btn btn-success fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalAjustement">
-                <i class="fas fa-plus-circle me-1"></i> Nouveau Mouvement
+                 Nouveau Mouvement
             </button>
         </div>
     </div>
 
     <?php if (isset($error)): ?>
         <div class="alert alert-danger shadow-sm">
-            <i class="fas fa-exclamation-triangle me-2"></i> <?= $error ?>
+           <?= $error ?>
         </div>
     <?php endif; ?>
 
@@ -70,7 +70,7 @@ require_once '../../templates/navigation.php';
                                 <h2 class="fw-bold m-0 mt-1"><?= number_format($compte['solde'], 0, ',', ' ') ?> <small class="fs-6">FCFA</small></h2>
                             </div>
                             <div class="bg-light p-3 rounded-circle">
-                                <i class="fas fa-wallet text-primary fa-lg"></i>
+                               
                             </div>
                         </div>
                     </div>

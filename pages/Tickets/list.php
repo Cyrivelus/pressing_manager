@@ -67,6 +67,7 @@ include '../../templates/navigation.php';
                             <a href="view.php?id=<?= $t['id_ticket'] ?>" class="btn btn-xs btn-default">Voir</a>
                             <a href="print.php?id=<?= $t['id_ticket'] ?>" class="btn btn-xs btn-primary">Imprimer</a>
                             <a href="print_commerce.php?id=<?= $t['id_ticket'] ?>" class="btn btn-xs btn-primary">Imprimer pour commerce</a>
+                            <a href="print_hotel.php?id=<?= $t['id_ticket'] ?>" class="btn btn-xs btn-primary">Imprimer pour hôtel</a>
                         </td>
                     </tr>
                     <?php endforeach; ?>

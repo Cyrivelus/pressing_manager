@@ -1,7 +1,7 @@
 <?php
 require_once(__DIR__ . '/../../templates/header.php');
 require_once(__DIR__ . '/../../templates/navigation.php');
-require_once(__DIR__ . '/../../templates/footer.php');
+
 
 // 1. Définition de la date (Aujourd'hui par défaut ou date choisie)
 $date_rapport = $_GET['date'] ?? date('Y-m-d');
@@ -150,3 +150,6 @@ $solde_net = $total_recettes - $total_depenses;
     .border-left-danger { border-left: 0.25rem solid #e74a3b !important; }
     .text-xs { font-size: .7rem; }
 </style>
+<?php
+require_once(__DIR__ . '/../../templates/footer.php');
+?>

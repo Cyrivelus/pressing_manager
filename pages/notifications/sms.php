@@ -24,7 +24,7 @@ require_once  '../../templates/navigation.php';
 <div class="container-fluid py-5">
     <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
         <div>
-            <h2 class="fw-bold m-0 text-success"><i class="fas fa-comment-alt me-2"></i><?= $titre ?></h2>
+            <h2 class="fw-bold m-0 text-success"><?= $titre ?></h2>
             <p class="text-muted">Communication instantanée avec vos clients</p>
         </div>
         <div class="card border-0 shadow-sm px-3 py-2 bg-light">
@@ -53,7 +53,7 @@ require_once  '../../templates/navigation.php';
                             </div>
                         </div>
                         <button type="submit" class="btn btn-success w-100 fw-bold">
-                            <i class="fas fa-paper-plane me-2"></i>Envoyer maintenant
+                            Envoyer maintenant
                         </button>
                     </form>
                 </div>
@@ -107,7 +107,8 @@ require_once  '../../templates/navigation.php';
                         <td class="small" style="max-width: 300px;"><?= htmlspecialchars($h['contenu']) ?></td>
                         <td><?= date('d/m/Y H:i', strtotime($h['date_envoi'])) ?></td>
                         <td class="text-center">
-                            <span class="badge bg-success-soft text-success"><i class="fas fa-check-double me-1"></i> Reçu</span>
+                            <span class="badge bg-success-soft text-success">
+                                 Reçu</span>
                         </td>
                     </tr>
                     <?php endforeach; ?>

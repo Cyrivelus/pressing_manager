@@ -35,12 +35,12 @@ require_once  '../../templates/navigation.php';
 
     <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
         <div>
-            <h2 class="fw-bold m-0 text-danger"><i class="fas fa-bolt me-2"></i><?= $titre ?></h2>
+            <h2 class="fw-bold m-0 text-danger"><?= $titre ?></h2>
             <p class="text-muted">Suivi temps réel des commandes à haute priorité et délais critiques</p>
         </div>
         <div class="d-flex gap-2">
             <span class="badge bg-danger p-2 px-3 shadow-sm d-flex align-items-center" style="border-radius: 10px;">
-                <i class="fas fa-exclamation-triangle me-2"></i> <?= count($urgences) ?> Commande(s) Urgente(s)
+                 <?= count($urgences) ?> Commande(s) Urgente(s)
             </span>
         </div>
     </div>
@@ -102,7 +102,7 @@ require_once  '../../templates/navigation.php';
                         </td>
                         <td>
                             <div class="fw-bold text-dark"><?= htmlspecialchars($u['nom_client']) ?></div>
-                            <small class="text-muted"><i class="fas fa-phone-alt me-1 small"></i> <?= $u['telephone'] ?></small>
+                            <small class="text-muted"> <?= $u['telephone'] ?></small>
                         </td>
                         <td>
                             <span class="badge bg-danger text-uppercase p-2 mb-1">Express 4H</span><br>
@@ -112,7 +112,7 @@ require_once  '../../templates/navigation.php';
                         </td>
                         <td class="text-center">
                             <span class="<?= $timer_color ?> d-flex align-items-center justify-content-center">
-                                <i class="fas fa-hourglass-half me-2"></i>
+                               
                                 <?php 
                                     if($min < 0) echo "<span class='badge bg-danger'>EN RETARD (" . abs($min) . "m)</span>";
                                     else echo "<strong>".floor($min/60)."h ".($min%60)."m</strong>";
@@ -124,7 +124,7 @@ require_once  '../../templates/navigation.php';
                         </td>
                         <td class="text-end pe-4">
                             <a href="../production/marquer_pret.php?id=<?= $u['id_ticket'] ?>" class="btn btn-sm btn-dark px-3 rounded-pill">
-                                <i class="fas fa-check me-1"></i> Prêt
+                                Prêt
                             </a>
                         </td>
                     </tr>
@@ -132,7 +132,7 @@ require_once  '../../templates/navigation.php';
                     <?php if(empty($urgences)): ?>
                         <tr>
                             <td colspan="6" class="text-center py-5 text-muted">
-                                <i class="fas fa-check-circle fa-3x mb-3 opacity-25"></i>
+                               
                                 <p>Aucune commande express en attente.</p>
                             </td>
                         </tr>

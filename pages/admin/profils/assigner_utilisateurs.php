@@ -71,7 +71,7 @@ include('../../../templates/navigation.php');
         <div class="row">
             <div class="col-12">
                 <div class="d-flex align-items-center mb-4">
-                    <a href="index.php" class="btn btn-outline-secondary me-3"><i class="fas fa-arrow-left"></i></a>
+                    <a href="index.php" class="btn btn-outline-secondary me-3"></a>
                     <h2>Assigner des utilisateurs au rôle : <span class="text-primary"><?= htmlspecialchars($roleInfo['nom_role']) ?></span></h2>
                 </div>
 
@@ -118,7 +118,7 @@ include('../../../templates/navigation.php');
                         
                         <div class="card-footer bg-white py-3">
                             <button type="submit" class="btn btn-primary px-5">
-                                <i class="fas fa-user-check me-2"></i> Valider l'assignation
+                         Valider l'assignation
                             </button>
                         </div>
                     </form>

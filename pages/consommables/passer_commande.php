@@ -21,16 +21,16 @@ $articles_a_commander = $pdo->query($sql)->fetchAll();
 require_once  '../../templates/header.php';
 require_once  '../../templates/navigation.php';
 ?>
-
+<br><br><br>
 <div class="container-fluid py-5">
     <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
         <div>
-            <h2 class="fw-bold m-0 text-dark"><i class="fas fa-shopping-cart text-primary me-2"></i><?= $titre ?></h2>
+            <h2 class="fw-bold m-0 text-dark"><?= $titre ?></h2>
             <p class="text-muted">Générez vos besoins de réapprovisionnement basés sur les seuils critiques.</p>
         </div>
-        <a href="index.php" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left"></i> Retour au stock
-        </a>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary">
+     <-Retour 
+</a>
     </div>
 
     <form action="generer_pdf_commande.php" method="POST" target="_blank">
@@ -54,7 +54,7 @@ require_once  '../../templates/navigation.php';
                         <?php if (empty($articles_a_commander)): ?>
                             <tr>
                                 <td colspan="6" class="text-center py-5 text-muted">
-                                    <i class="fas fa-check-circle fa-2x text-success mb-2"></i><br>
+                                  <br>
                                     Tous les stocks sont optimaux. Aucun article en alerte.
                                 </td>
                             </tr>
@@ -94,7 +94,7 @@ require_once  '../../templates/navigation.php';
             <div class="card-footer bg-light d-flex justify-content-between align-items-center py-3">
                 <div class="h5 mb-0">Total estimé de la commande : <span id="grand-total" class="fw-bold text-primary">0</span> FCFA</div>
                 <button type="submit" class="btn btn-success btn-lg shadow-sm" <?= empty($articles_a_commander) ? 'disabled' : '' ?>>
-                    <i class="fas fa-file-pdf"></i> Générer le Bon de Commande
+                  Générer le Bon de Commande
                 </button>
             </div>
         </div>

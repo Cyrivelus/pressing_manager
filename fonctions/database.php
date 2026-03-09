@@ -1,57 +1,54 @@
 <?php
 // fonctions/database.php
 
-// Configuration de la connexion MySQL sur localhost
-$dbHost = "localhost"; // Généralement 'localhost' pour une base de données locale
-$dbName = "pressing_manager";  // Nom de votre base de données MySQL
-$dbUser = "root";      // Nom d'utilisateur MySQL (souvent 'root' pour localhost)
-$dbPass = "";          // Mot de passe MySQL (souvent vide pour 'root' sur localhost, ou votre mot de passe)
-$dbCharset = "utf8mb4"; // Jeu de caractères recommandé pour MySQL
+// 1. Détection de l'environnement (Local vs Production)
+$isLocal = ($_SERVER['REMOTE_ADDR'] == '127.0.0.1' || $_SERVER['REMOTE_ADDR'] == '::1');
 
-// DSN (Data Source Name) pour PDO MySQL
+if ($isLocal) {
+    // CONFIGURATION XAMPP (Local)
+    $dbHost = "localhost";
+    $dbName = "pressing_manager";
+    $dbUser = "root";
+    $dbPass = "";
+} else {
+    // CONFIGURATION INFINITYFREE (Production)
+    // IMPORTANT : Récupère ces infos dans ton Panel InfinityFree > MySQL Databases
+    $dbHost = "sql103.infinityfree.com"; // EXEMPLE : Vérifie le tien dans le panel
+    $dbName = "if0_41343012_pressing_manager"; // EXEMPLE : Le nom que tu as créé
+    $dbUser = "if0_41343012";             // Ton nom d'utilisateur hosting
+    $dbPass = "dHMa1eiAPMwY"; // Ton mot de passe (celui du compte client)
+}
+
+$dbCharset = "utf8mb4";
 $dsn = "mysql:host=$dbHost;dbname=$dbName;charset=$dbCharset";
 
-// Options de connexion PDO
 $connectionOptions = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Configure PDO pour lancer des exceptions en cas d'erreur
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,       // Définit le mode de récupération par défaut des résultats en tableau associatif
-    PDO::ATTR_EMULATE_PREPARES   => false,                  // Désactive l'émulation des requêtes préparées pour une meilleure sécurité et performance
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
 ];
 
 try {
-    // TENTATIVE DE CONNEXION :
-    // Utilisation du DSN, du nom d'utilisateur et du mot de passe MySQL
     $pdo = new PDO($dsn, $dbUser, $dbPass, $connectionOptions);
-
-    // Une vérification simple pour s'assurer que la connexion est active.
-    $pdo->query("SELECT 1");
-
 } catch (PDOException $e) {
-    // Journalisation de l'erreur détaillée dans les logs d'Apache/PHP
-    error_log("Erreur de connexion à la base de données MySQL: " . $e->getMessage());
-
-    // Envoi d'une en-tête HTTP 500 pour indiquer une erreur serveur
-    if (!headers_sent()) {
-        header("HTTP/1.1 500 Internal Server Error");
+    // En production, on cache les détails sensibles
+    if ($isLocal) {
+        die("Erreur de connexion (DEBUG) : " . $e->getMessage());
+    } else {
+        error_log("DB Error: " . $e->getMessage());
+        die("Le service est momentanément indisponible.");
     }
-
-    // Affiche le message d'erreur détaillé directement sur la page web pour le débogage.
-    // TRÈS IMPORTANT : NE PAS UTILISER CECI EN PRODUCTION pour des raisons de sécurité !
-    die("Impossible de se connecter à la base de données. Veuillez réessayer plus tard.<br><br><b>DÉTAIL DE L'ERREUR (DEBUG) :</b> " . $e->getMessage() . "<br>Veuillez vérifier les identifiants MySQL, l'état du serveur MySQL (e.g., XAMPP/WAMP est-il démarré ?) et les pare-feu.");
 }
 
-// Fonction utilitaire pour exécuter des requêtes préparées en toute sécurité.
+// Ta fonction utilitaire reste inchangée
 function executeQuery($sql, $params = []) {
-    global $pdo; // Accède à l'objet PDO global pour la connexion
-
+    global $pdo;
     try {
-        $stmt = $pdo->prepare($sql); // Prépare la requête SQL
-        $stmt->execute($params);     // Exécute la requête avec les paramètres fournis
-        return $stmt;                // Retourne l'objet PDOStatement
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt;
     } catch (PDOException $e) {
-        // Journalisation de l'erreur SQL spécifique pour le débogage
-        error_log("Erreur SQL MySQL: " . $e->getMessage() . " - Requête: " . $sql);
-        // Relance l'exception pour que le code appelant puisse la gérer
+        error_log("Erreur SQL : " . $e->getMessage());
         throw $e;
     }
 }

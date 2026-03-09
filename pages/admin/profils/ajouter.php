@@ -127,5 +127,3 @@ function prefillRole(nom, desc) {
     setTimeout(() => form.style.backgroundColor = '', 500);
 }
 </script>
-
-<?php include('../../../templates/footer.php'); ?>

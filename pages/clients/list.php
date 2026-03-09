@@ -40,7 +40,7 @@ try {
 
 include '../../templates/header.php';
 include '../../templates/navigation.php';
-include '../../templates/footer.php'; // Votre nouveau header avec Bootstrap inclu
+
 ?>
 </BR></BR></BR>
 <div class="container-fluid" style="margin-top: 20px;">

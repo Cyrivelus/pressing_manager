@@ -1,5 +1,5 @@
 <?php
-// templates/navigation.php
+// templates/navigation.php - Version Multi-Activités (Pressing/Commerce/Hôtel)
 
 // 1. Start output buffering to prevent "headers already sent" errors
 ob_start();
@@ -97,31 +97,147 @@ function getDatabaseConnection() {
     }
 }
 
-// Fonction pour vérifier les permissions selon le rôle
+// Fonction pour vérifier les permissions selon le rôle (DYNAMIQUE depuis la BD)
 function hasPermission($role, $requiredPermission) {
-    $permissions = [
-        'patron' => ['all', 'dashboard', 'gestion_tickets', 'gestion_clients', 'gestion_stock', 'gestion_caisse', 'rapports', 'administration', 'gestion_comptes', 'gestion_factures', 'gestion_fournisseurs', 'gestion_agences', 'audit', 'abonnements', 'atelier', 'boutique', 'client_portal', 'consommables', 'environnement', 'fidelite', 'intelligent_dashboard', 'livraison', 'maintenance', 'marketing', 'notifications', 'paiements_online', 'partenariats', 'qualite', 'reservation_online', 'tracabilite', 'urgences'],
-        'Responsable' => ['dashboard', 'gestion_tickets', 'gestion_clients', 'gestion_stock', 'gestion_caisse', 'rapports', 'gestion_comptes', 'gestion_factures', 'abonnements', 'atelier', 'consommables', 'fidelite', 'intelligent_dashboard', 'livraison', 'maintenance', 'qualite', 'tracabilite', 'urgences'],
-        'Réceptionniste' => ['gestion_tickets', 'gestion_clients', 'caisse', 'abonnements', 'fidelite', 'reservation_online', 'tracabilite', 'urgences'],
-        'Technicien' => ['gestion_tickets', 'gestion_stock', 'atelier', 'maintenance', 'tracabilite'],
-        'Caissier' => ['caisse', 'gestion_tickets', 'paiements_online', 'fidelite'],
-        'gestionnaire_stock' => ['dashboard', 'gestion_stock', 'consommables', 'atelier'],
-        'employe_pressing' => ['gestion_tickets', 'atelier', 'tracabilite']
-    ];
-    
-    if (!isset($permissions[$role])) {
-        return false;
-    }
-    
-    if (in_array('all', $permissions[$role])) {
+    // Si c'est le patron, il a toutes les permissions
+    if ($role === 'patron') {
         return true;
     }
     
-    return in_array($requiredPermission, $permissions[$role]);
+    // Sinon, vérifier dans la base de données
+    try {
+        $db = getDatabaseConnection();
+        if (!$db) return false;
+        
+        // Récupérer l'ID du rôle
+        $stmt = $db->prepare("SELECT id_role FROM roles WHERE nom_role = ?");
+        $stmt->execute([$role]);
+        $roleData = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$roleData) return false;
+        
+        $roleId = $roleData['id_role'];
+        
+        // Vérifier si le rôle a la permission
+        $stmt = $db->prepare("
+            SELECT COUNT(*) as has_permission 
+            FROM role_permissions rp
+            JOIN permissions p ON rp.id_permission = p.id_permission
+            WHERE rp.id_role = ? AND p.code_permission = ?
+        ");
+        $stmt->execute([$roleId, $requiredPermission]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        return ($result && $result['has_permission'] > 0);
+        
+    } catch (Exception $e) {
+        error_log("Erreur lors de la vérification des permissions: " . $e->getMessage());
+        return false;
+    }
 }
 
-$version = "2.0.0";
+// Fonction pour récupérer toutes les permissions d'un rôle
+function getUserPermissions($role) {
+    $permissions = [];
+    
+    // Si c'est le patron, retourner toutes les permissions
+    if ($role === 'patron') {
+        $allPermissions = [
+            'dashboard', 'gestion_tickets', 'gestion_clients', 'gestion_stock', 
+            'gestion_caisse', 'rapports', 'administration', 'gestion_comptes', 
+            'gestion_factures', 'gestion_fournisseurs', 'gestion_agences', 
+            'audit', 'abonnements', 'atelier', 'boutique', 'client_portal', 
+            'consommables', 'environnement', 'fidelite', 'intelligent_dashboard', 
+            'livraison', 'maintenance', 'marketing', 'notifications', 
+            'paiements_online', 'partenariats', 'qualite', 'reservation_online', 
+            'tracabilite', 'urgences', 'hotellerie', 'reservations_hotel',
+            'gestion_chambres', 'service_chambre', 'gestion_commerce'
+        ];
+        return array_fill_keys($allPermissions, true);
+    }
+    
+    // Sinon, récupérer depuis la base de données
+    try {
+        $db = getDatabaseConnection();
+        if (!$db) return $permissions;
+        
+        // Récupérer l'ID du rôle
+        $stmt = $db->prepare("SELECT id_role FROM roles WHERE nom_role = ?");
+        $stmt->execute([$role]);
+        $roleData = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$roleData) return $permissions;
+        
+        $roleId = $roleData['id_role'];
+        
+        // Récupérer toutes les permissions du rôle
+        $stmt = $db->prepare("
+            SELECT p.code_permission 
+            FROM role_permissions rp
+            JOIN permissions p ON rp.id_permission = p.id_permission
+            WHERE rp.id_role = ?
+        ");
+        $stmt->execute([$roleId]);
+        $permissionCodes = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+        
+        return array_fill_keys($permissionCodes, true);
+        
+    } catch (Exception $e) {
+        error_log("Erreur lors de la récupération des permissions utilisateur: " . $e->getMessage());
+        return $permissions;
+    }
+}
+
+// Fonction pour récupérer l'activité configurée pour l'utilisateur
+function getUserActivityType($userId) {
+    try {
+        $db = getDatabaseConnection();
+        if (!$db) return 'pressing'; // Par défaut
+        
+        $stmt = $db->prepare("
+            SELECT type_activite 
+            FROM utilisateur_activites 
+            WHERE id_utilisateur = ?
+        ");
+        $stmt->execute([$userId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        return $result ? $result['type_activite'] : 'pressing';
+        
+    } catch (Exception $e) {
+        error_log("Erreur lors de la récupération du type d'activité: " . $e->getMessage());
+        return 'pressing';
+    }
+}
+
+// Fonction pour vérifier si l'activité est activée
+function isActivityEnabled($activityType) {
+    try {
+        $db = getDatabaseConnection();
+        if (!$db) return true; // Par défaut activé
+        
+        $stmt = $db->prepare("
+            SELECT actif 
+            FROM activites_config 
+            WHERE type_activite = ?
+        ");
+        $stmt->execute([$activityType]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        return $result ? (bool)$result['actif'] : true;
+        
+    } catch (Exception $e) {
+        error_log("Erreur lors de la vérification de l'activité: " . $e->getMessage());
+        return true;
+    }
+}
+
+$version = "3.0.0";
 $roleUtilisateur = $_SESSION['nom_role'] ?? $_SESSION['role'] ?? 'Réceptionniste';
+$userId = $_SESSION['utilisateur_id'] ?? null;
+
+// Récupérer le type d'activité de l'utilisateur
+$userActivity = $userId ? getUserActivityType($userId) : 'pressing';
 
 if ($estConnecte):
     // Récupérer les informations utilisateur
@@ -129,15 +245,17 @@ if ($estConnecte):
     try {
         $db = getDatabaseConnection();
         if ($db) {
-            $user_id = $_SESSION['utilisateur_id'];
-            $stmt = $db->prepare("SELECT nom, prenom, email FROM utilisateurs WHERE id = ?");
-            $stmt->execute([$user_id]);
+            $stmt = $db->prepare("SELECT nom_complet, email FROM utilisateurs WHERE id_utilisateur = ?");
+            $stmt->execute([$userId]);
             $user_info = $stmt->fetch(PDO::FETCH_ASSOC);
         }
     } catch (Exception $e) {
         error_log("Erreur lors de la récupération des informations utilisateur: " . $e->getMessage());
-        $user_info = ['nom' => 'Utilisateur', 'prenom' => '', 'email' => ''];
+        $user_info = ['nom_complet' => 'Utilisateur', 'email' => ''];
     }
+    
+    // Récupérer toutes les permissions de l'utilisateur courant
+    $userPermissions = getUserPermissions($roleUtilisateur);
 ?>
 
 <!DOCTYPE html>
@@ -145,7 +263,7 @@ if ($estConnecte):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <title>Navigation Pressing Manager</title>
+    <title>Navigation Kayade Manager</title>
     
     <!-- Bootstrap CSS local -->
     <link rel="stylesheet" href="<?= generateUrl('css/bootstrap.min.css') ?>">
@@ -161,12 +279,61 @@ if ($estConnecte):
         :root {
             --primary-color: #2c3e50;
             --secondary-color: #3498db;
-            --accent-color: #e74c3c;
+            --accent-pressing: #e74c3c;
+            --accent-commerce: #27ae60;
+            --accent-hotel: #f39c12;
             --text-color: #333;
             --light-bg: #f8f9fa;
-            --sidebar-width: 280px;
+            --sidebar-width: 300px;
             --sidebar-collapsed-width: 80px;
             --transition-speed: 0.3s;
+        }
+
+        /* Indicateur d'activité */
+        .activity-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 5px;
+            text-transform: uppercase;
+        }
+        
+        .activity-pressing {
+            background-color: var(--accent-pressing);
+            color: white;
+        }
+        
+        .activity-commerce {
+            background-color: var(--accent-commerce);
+            color: white;
+        }
+        
+        .activity-hotel {
+            background-color: var(--accent-hotel);
+            color: white;
+        }
+
+        /* Style différent pour chaque activité */
+        .nav-section.pressing-section .nav-title {
+            border-left: 4px solid var(--accent-pressing);
+        }
+        
+        .nav-section.commerce-section .nav-title {
+            border-left: 4px solid var(--accent-commerce);
+        }
+        
+        .nav-section.hotel-section .nav-title {
+            border-left: 4px solid var(--accent-hotel);
+        }
+
+        /* Badge d'activité dans le header */
+        .user-activity {
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 0.8rem;
+            opacity: 0.8;
         }
 
         /* Reset et base */
@@ -279,6 +446,7 @@ if ($estConnecte):
             white-space: nowrap;
             opacity: 1;
             transition: opacity var(--transition-speed);
+            padding-left: 15px;
         }
 
         .sidebar.collapsed .nav-title {
@@ -451,12 +619,15 @@ if ($estConnecte):
             font-size: 0.8rem;
             color: rgba(255,255,255,0.6);
             margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .info-label {
             font-weight: 600;
             color: rgba(255,255,255,0.8);
-            margin-bottom: 2px;
+            margin-right: 4px;
         }
 
         .info-value {
@@ -474,7 +645,7 @@ if ($estConnecte):
 
         /* Badge pour nouvelles fonctionnalités */
         .nav-badge {
-            background: var(--accent-color);
+            background: var(--accent-pressing);
             color: white;
             font-size: 0.7rem;
             padding: 2px 6px;
@@ -675,50 +846,62 @@ if ($estConnecte):
 
 <!-- Sidebar pour desktop -->
 <aside class="sidebar" id="sidebar">
+<br><br><br>
     <div class="sidebar-header">
-        <h2 class="app-title">Pressing Manager</h2>
-        <button class="toggle-btn" id="toggleDesktop">
-            <span class="icon">←</span>
-        </button>
-    </div>
-    
+    <h2 class="app-title">Kayade<span>Manager</span>
+        <?php 
+        // On récupère le rôle de l'utilisateur (par défaut 'caissier' s'il n'est pas défini pour plus de sécurité)
+        $userRole = $_SESSION['role'] ?? 'caissier'; 
+
+        // On n'affiche le badge QUE si le rôle n'est PAS 'caissier'
+        if ($userRole !== 'caissier'): 
+        ?>
+            <span class="user-activity activity-badge activity-<?= htmlspecialchars($userActivity) ?>">
+                <?= strtoupper(htmlspecialchars($userActivity)) ?>
+            </span>
+        <?php endif; ?>
+    </h2>
+    <button class="toggle-btn" id="toggleDesktop" title="Réduire le menu">
+        <span class="icon">←</span>
+    </button>
+</div>
     <nav class="sidebar-nav">
         <!-- Section Principale -->
         <div class="nav-section">
             <div class="nav-title">Navigation Principale</div>
             
-            <?php if (hasPermission($roleUtilisateur, 'dashboard')): ?>
+            <?php if (isset($userPermissions['dashboard'])): ?>
             <div class="nav-item">
                 <a class="nav-link <?= isActive('pages/dashboard.php', $relative_uri) ? 'active' : '' ?>" 
                    href="<?= generateUrl('pages/dashboard.php') ?>"
                    data-tooltip="Tableau de Bord">
-                    <i class="nav-icon fa fa-tachometer-alt"></i>
+                   <i class="nav-icon">📊</i>
                     <span class="nav-text">Tableau de Bord</span>
                 </a>
             </div>
             <?php endif; ?>
 
-            <?php if (hasPermission($roleUtilisateur, 'intelligent_dashboard')): ?>
+            <?php if (isset($userPermissions['intelligent_dashboard'])): ?>
             <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/intelligent_dashboard/') === 0 ? 'open' : '' ?>">
                 <a class="nav-link" href="#" data-tooltip="Dashboard Intelligent">
-                    <i class="nav-icon fa fa-chart-line"></i>
+                    <i class="nav-icon">🧠</i>
                     <span class="nav-text">Dashboard Intelligent</span>
                     <span class="nav-badge">NEW</span>
                 </a>
                 <div class="submenu">
                     <a class="submenu-link <?= isActive('pages/intelligent_dashboard/temps_reel.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/intelligent_dashboard/temps_reel.php') ?>">
-                        <i class="submenu-icon fa fa-clock"></i>
+                        <i class="submenu-icon">⚡</i>
                         <span>Temps Réel</span>
                     </a>
                     <a class="submenu-link <?= isActive('pages/intelligent_dashboard/alertes_automatiques.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/intelligent_dashboard/alertes_automatiques.php') ?>">
-                        <i class="submenu-icon fa fa-bell"></i>
+                        <i class="submenu-icon">🚨</i>
                         <span>Alertes Automatiques</span>
                     </a>
                     <a class="submenu-link <?= isActive('pages/intelligent_dashboard/analyse_rentabilite.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/intelligent_dashboard/analyse_rentabilite.php') ?>">
-                        <i class="submenu-icon fa fa-chart-pie"></i>
+                        <i class="submenu-icon">💰</i>
                         <span>Analyse Rentabilité</span>
                     </a>
                 </div>
@@ -726,625 +909,335 @@ if ($estConnecte):
             <?php endif; ?>
         </div>
 
-        <!-- Section Opérations -->
-        <div class="nav-section">
-            <div class="nav-title">Opérations</div>
+        <!-- SECTION PRESSING (Activité principale) -->
+        <?php if (isActivityEnabled('pressing') && ($userActivity == 'pressing' || $userActivity == 'all')): ?>
+        <div class="nav-section pressing-section">
+            <div class="nav-title">Pressing & Blanchisserie</div>
             
-            <?php if (hasPermission($roleUtilisateur, 'gestion_tickets')): ?>
+            <?php if (isset($userPermissions['gestion_tickets'])): ?>
             <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/Tickets/') === 0 || strpos($relative_uri, 'pages/reception/') === 0 ? 'open' : '' ?>">
                 <a class="nav-link" href="#" data-tooltip="Gestion des Tickets">
-                    <i class="nav-icon fa fa-ticket-alt"></i>
-                    <span class="nav-text">Tickets</span>
+                    <i class="nav-icon">🎫</i>
+                    <span class="nav-text">Tickets Pressing</span>
                 </a>
                 <div class="submenu">
                     <a class="submenu-link <?= isActive('pages/Tickets/create.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/Tickets/create.php') ?>">
-                        <i class="submenu-icon fa fa-plus-circle"></i>
+                        <i class="submenu-icon">➕</i>
                         <span>Nouveau Ticket</span>
                     </a>
                     <a class="submenu-link <?= isActive('pages/Tickets/list.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/Tickets/list.php') ?>">
-                        <i class="submenu-icon fa fa-list"></i>
+                        <i class="submenu-icon">📋</i>
                         <span>Liste des Tickets</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/Tickets/pending.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/Tickets/pending.php') ?>">
-                        <i class="submenu-icon fa fa-clock"></i>
-                        <span>En attente</span>
                     </a>
                     <a class="submenu-link <?= isActive('pages/reception/receptionniste.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/reception/receptionniste.php') ?>">
-                        <i class="submenu-icon fa fa-user-tie"></i>
+                        <i class="submenu-icon">🏢</i>
                         <span>Réception</span>
                     </a>
                 </div>
             </div>
             <?php endif; ?>
 
-            <?php if (hasPermission($roleUtilisateur, 'tracabilite')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/tracabilite/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Traçabilité">
-                    <i class="nav-icon fa fa-qrcode"></i>
-                    <span class="nav-text">Traçabilité</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/tracabilite/etiquettes_rfid.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/tracabilite/etiquettes_rfid.php') ?>">
-                        <i class="submenu-icon fa fa-rfid"></i>
-                        <span>Étiquettes RFID</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/tracabilite/scan_qrcode.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/tracabilite/scan_qrcode.php') ?>">
-                        <i class="submenu-icon fa fa-qrcode"></i>
-                        <span>Scan QR Code</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/tracabilite/photos_avant_apres.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/tracabilite/photos_avant_apres.php') ?>">
-                        <i class="submenu-icon fa fa-camera"></i>
-                        <span>Photos Avant/Après</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'atelier')): ?>
+            <?php if (isset($userPermissions['atelier'])): ?>
             <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/atelier/') === 0 ? 'open' : '' ?>">
                 <a class="nav-link" href="#" data-tooltip="Atelier">
-                    <i class="nav-icon fa fa-industry"></i>
-                    <span class="nav-text">Atelier</span>
-                    <span class="nav-badge">NEW</span>
+                    <i class="nav-icon">⚙️</i>
+                    <span class="nav-text">Atelier Pressing</span>
                 </a>
                 <div class="submenu">
                     <a class="submenu-link <?= isActive('pages/atelier/planning_machines.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/atelier/planning_machines.php') ?>">
-                        <i class="submenu-icon fa fa-calendar-alt"></i>
+                        <i class="submenu-icon">📅</i>
                         <span>Planning Machines</span>
                     </a>
                     <a class="submenu-link <?= isActive('pages/atelier/suivi_production.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/atelier/suivi_production.php') ?>">
-                        <i class="submenu-icon fa fa-chart-line"></i>
+                        <i class="submenu-icon">📈</i>
                         <span>Suivi Production</span>
                     </a>
-                    <a class="submenu-link <?= isActive('pages/atelier/controle_qualite.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/atelier/controle_qualite.php') ?>">
-                        <i class="submenu-icon fa fa-check-circle"></i>
-                        <span>Contrôle Qualité</span>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if (isset($userPermissions['tracabilite'])): ?>
+            <div class="nav-item">
+                <a class="nav-link <?= isActive('pages/tracabilite/scan_qrcode.php', $relative_uri) ? 'active' : '' ?>" 
+                   href="<?= generateUrl('pages/tracabilite/scan_qrcode.php') ?>"
+                   data-tooltip="Traçabilité">
+                    <i class="nav-icon">🔍</i>
+                    <span class="nav-text">Traçabilité</span>
+                </a>
+            </div>
+            <?php endif; ?>
+
+            <?php if (isset($userPermissions['livraison'])): ?>
+            <div class="nav-item">
+                <a class="nav-link <?= isActive('pages/livraison/tournees.php', $relative_uri) ? 'active' : '' ?>" 
+                   href="<?= generateUrl('pages/livraison/tournees.php') ?>"
+                   data-tooltip="Livraison">
+                    <i class="nav-icon">🚚</i>
+                    <span class="nav-text">Livraison</span>
+                </a>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- SECTION COMMERCE -->
+        <?php if (isActivityEnabled('commerce') && ($userActivity == 'commerce' || $userActivity == 'all')): ?>
+        <div class="nav-section commerce-section">
+            <div class="nav-title">Boutique & Commerce</div>
+            
+            <?php if (isset($userPermissions['gestion_commerce'])): ?>
+            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/boutique/') === 0 ? 'open' : '' ?>">
+                <a class="nav-link" href="#" data-tooltip="Boutique">
+                    <i class="nav-icon">🛒</i>
+                    <span class="nav-text">Boutique</span>
+                </a>
+                <div class="submenu">
+                    <a class="submenu-link <?= isActive('pages/boutique/index.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/boutique/index.php') ?>">
+                        <i class="submenu-icon">📦</i>
+                        <span>Catalogue Produits</span>
+                    </a>
+                    <a class="submenu-link <?= isActive('pages/boutique/commandes.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/boutique/commandes.php') ?>">
+                        <i class="submenu-icon">📋</i>
+                        <span>Gestion Commandes</span>
+                    </a>
+                    <a class="submenu-link <?= isActive('pages/boutique/statistiques.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/boutique/statistiques.php') ?>">
+                        <i class="submenu-icon">📊</i>
+                        <span>Statistiques Ventes</span>
                     </a>
                 </div>
             </div>
             <?php endif; ?>
 
-            <?php if (hasPermission($roleUtilisateur, 'maintenance')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/maintenance/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Maintenance">
-                    <i class="nav-icon fa fa-tools"></i>
-                    <span class="nav-text">Maintenance</span>
-                    <span class="nav-badge">NEW</span>
+            <?php if (isset($userPermissions['gestion_stock'])): ?>
+            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/stock/') === 0 ? 'open' : '' ?>">
+                <a class="nav-link" href="#" data-tooltip="Stock Commerce">
+                    <i class="nav-icon">📦</i>
+                    <span class="nav-text">Stock Commerce</span>
                 </a>
                 <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/maintenance/calendrier.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/maintenance/calendrier.php') ?>">
-                        <i class="submenu-icon fa fa-calendar"></i>
-                        <span>Planning Maintenance</span>
+                    <a class="submenu-link <?= isActive('pages/stock/add_product.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/stock/add_product.php') ?>">
+                        <i class="submenu-icon">➕</i>
+                        <span>Ajouter Produit</span>
                     </a>
-                    <a class="submenu-link <?= isActive('pages/maintenance/interventions.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/maintenance/interventions.php') ?>">
-                        <i class="submenu-icon fa fa-wrench"></i>
-                        <span>Suivi Interventions</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'qualite')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/qualite/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Qualité">
-                    <i class="nav-icon fa fa-award"></i>
-                    <span class="nav-text">Qualité</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/qualite/reclamations.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/qualite/reclamations.php') ?>">
-                        <i class="submenu-icon fa fa-exclamation-circle"></i>
-                        <span>Réclamations</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/qualite/satisfaction.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/qualite/satisfaction.php') ?>">
-                        <i class="submenu-icon fa fa-smile"></i>
-                        <span>Satisfaction Clients</span>
+                    <a class="submenu-link <?= isActive('pages/stock/inventory.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/stock/inventory.php') ?>">
+                        <i class="submenu-icon">📊</i>
+                        <span>Inventaire</span>
                     </a>
                 </div>
             </div>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
 
-        <!-- Section Clients -->
-        <div class="nav-section">
-            <div class="nav-title">Clients & Ventes</div>
+        <!-- SECTION HÔTEL -->
+        <?php if (isActivityEnabled('hotel') && ($userActivity == 'hotel' || $userActivity == 'all')): ?>
+        <div class="nav-section hotel-section">
+            <div class="nav-title">Hôtel & Services</div>
             
-            <?php if (hasPermission($roleUtilisateur, 'gestion_clients')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/clients/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Gestion des Clients">
-                    <i class="nav-icon fa fa-users"></i>
-                    <span class="nav-text">Clients</span>
+            <?php if (isset($userPermissions['hotellerie'])): ?>
+            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/partenariats/hotellerie/') === 0 ? 'open' : '' ?>">
+                <a class="nav-link" href="#" data-tooltip="Gestion Hôtel">
+                    <i class="nav-icon">🏨</i>
+                    <span class="nav-text">Hôtel</span>
                 </a>
                 <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/clients/create.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/clients/create.php') ?>">
-                        <i class="submenu-icon fa fa-user-plus"></i>
-                        <span>Nouveau Client</span>
+                    <a class="submenu-link <?= isActive('pages/partenariats/hotellerie.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/partenariats/hotellerie.php') ?>">
+                        <i class="submenu-icon">📋</i>
+                        <span>Gestion Hôtel</span>
                     </a>
-                    <a class="submenu-link <?= isActive('pages/clients/list.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/clients/list.php') ?>">
-                        <i class="submenu-icon fa fa-list"></i>
-                        <span>Liste Clients</span>
+                    <?php if (isset($userPermissions['gestion_chambres'])): ?>
+                    <a class="submenu-link <?= isActive('pages/hotel/chambres.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/hotel/chambres.php') ?>">
+                        <i class="submenu-icon">🛏️</i>
+                        <span>Chambres</span>
                     </a>
-                    <?php if (hasPermission($roleUtilisateur, 'gestion_comptes')): ?>
-                    <a class="submenu-link <?= isActive('pages/clients/comptes_gestion.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/clients/comptes_gestion.php') ?>">
-                        <i class="submenu-icon fa fa-wallet"></i>
-                        <span>Comptes Clients</span>
+                    <?php endif; ?>
+                    <?php if (isset($userPermissions['reservations_hotel'])): ?>
+                    <a class="submenu-link <?= isActive('pages/hotel/reservations.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/hotel/reservations.php') ?>">
+                        <i class="submenu-icon">📅</i>
+                        <span>Réservations</span>
                     </a>
                     <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
 
-            <?php if (hasPermission($roleUtilisateur, 'abonnements')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/abonnements/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Abonnements">
-                    <i class="nav-icon fa fa-calendar-check"></i>
-                    <span class="nav-text">Abonnements</span>
-                    <span class="nav-badge">NEW</span>
+            <?php if (isset($userPermissions['service_chambre'])): ?>
+            <div class="nav-item">
+                <a class="nav-link <?= isActive('pages/hotel/service_chambre.php', $relative_uri) ? 'active' : '' ?>" 
+                   href="<?= generateUrl('pages/hotel/service_chambre.php') ?>"
+                   data-tooltip="Service Chambre">
+                    <i class="nav-icon">🧹</i>
+                    <span class="nav-text">Service Chambre</span>
+                </a>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- SECTION CLIENTS (Commun à toutes les activités) -->
+        <div class="nav-section">
+            <div class="nav-title">Clients & Ventes</div>
+            
+            <?php if (isset($userPermissions['gestion_clients'])): ?>
+            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/clients/') === 0 ? 'open' : '' ?>">
+                <a class="nav-link" href="#" data-tooltip="Gestion des Clients">
+                    <i class="nav-icon">👥</i>
+                    <span class="nav-text">Clients</span>
                 </a>
                 <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/abonnements/index.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/abonnements/index.php') ?>">
-                        <i class="submenu-icon fa fa-list"></i>
-                        <span>Liste Abonnements</span>
+                    <a class="submenu-link <?= isActive('pages/clients/ajouter_client.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/clients/ajouter_client.php') ?>">
+                        <i class="submenu-icon">➕</i>
+                        <span>Nouveau Client</span>
                     </a>
-                    <a class="submenu-link <?= isActive('pages/abonnements/ajouter.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/abonnements/ajouter.php') ?>">
-                        <i class="submenu-icon fa fa-plus"></i>
-                        <span>Nouvel Abonnement</span>
+                    <a class="submenu-link <?= isActive('pages/clients/list.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/clients/list.php') ?>">
+                        <i class="submenu-icon">📋</i>
+                        <span>Liste Clients</span>
+                    </a>
+                    <a class="submenu-link <?= isActive('pages/clients/ajouter_client.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/clients/ajouter_client.php') ?>">
+                        <i class="submenu-icon">🏷️</i>
+                        <span>Catégoriser Client</span>
+                        <span class="activity-badge activity-<?= $userActivity ?>"><?= strtoupper(substr($userActivity, 0, 1)) ?></span>
                     </a>
                 </div>
             </div>
             <?php endif; ?>
 
-            <?php if (hasPermission($roleUtilisateur, 'fidelite')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/fidélite/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Programme Fidélité">
-                    <i class="nav-icon fa fa-gift"></i>
-                    <span class="nav-text">Fidélité</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/fidélite/cartes.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/fidélite/cartes.php') ?>">
-                        <i class="submenu-icon fa fa-address-card"></i>
-                        <span>Cartes Fidélité</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/fidélite/promotions.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/fidélite/promotions.php') ?>">
-                        <i class="submenu-icon fa fa-percentage"></i>
-                        <span>Promotions</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'caisse')): ?>
+            <?php if (isset($userPermissions['gestion_caisse'])): ?>
             <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/caisse/') === 0 ? 'open' : '' ?>">
                 <a class="nav-link" href="#" data-tooltip="Caisse">
-                    <i class="nav-icon fa fa-cash-register"></i>
+                    <i class="nav-icon">💰</i>
                     <span class="nav-text">Caisse</span>
                 </a>
                 <div class="submenu">
                     <a class="submenu-link <?= isActive('pages/caisse/index.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/caisse/index.php') ?>">
-                        <i class="submenu-icon fa fa-home"></i>
+                        <i class="submenu-icon">🏠</i>
                         <span>Accueil Caisse</span>
                     </a>
                     <a class="submenu-link <?= isActive('pages/caisse/encaisser.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/caisse/encaisser.php') ?>">
-                        <i class="submenu-icon fa fa-money-bill-wave"></i>
+                        <i class="submenu-icon">💵</i>
                         <span>Encaisser</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/caisse/mon_compte.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/caisse/mon_compte.php') ?>">
-                        <i class="submenu-icon fa fa-user-circle"></i>
-                        <span>Mon Compte</span>
                     </a>
                 </div>
             </div>
             <?php endif; ?>
 
-            <?php if (hasPermission($roleUtilisateur, 'gestion_factures')): ?>
+            <?php if (isset($userPermissions['gestion_factures'])): ?>
             <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/factures/') === 0 ? 'open' : '' ?>">
                 <a class="nav-link" href="#" data-tooltip="Factures">
-                    <i class="nav-icon fa fa-file-invoice-dollar"></i>
-                    <span class="nav-text">Factures</span>
+                    <i class="nav-icon">🧾</i>
+                    <span class="nav-text">Facturation</span>
                 </a>
                 <div class="submenu">
                     <a class="submenu-link <?= isActive('pages/factures/creer.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/factures/creer.php') ?>">
-                        <i class="submenu-icon fa fa-plus-circle"></i>
+                        <i class="submenu-icon">📝</i>
                         <span>Créer Facture</span>
                     </a>
                     <a class="submenu-link <?= isActive('pages/factures/liste.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/factures/liste.php') ?>">
-                        <i class="submenu-icon fa fa-list"></i>
-                        <span>Liste Factures</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-        </div>
-
-        <!-- Section Stock -->
-        <div class="nav-section">
-            <div class="nav-title">Stock & Inventaire</div>
-            
-            <?php if (hasPermission($roleUtilisateur, 'gestion_stock')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/stock/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Gestion du Stock">
-                    <i class="nav-icon fa fa-boxes"></i>
-                    <span class="nav-text">Stock</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/stock/add_product.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/stock/add_product.php') ?>">
-                        <i class="submenu-icon fa fa-plus-square"></i>
-                        <span>Ajouter Produit</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/stock/inventory.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/stock/inventory.php') ?>">
-                        <i class="submenu-icon fa fa-clipboard-list"></i>
-                        <span>Inventaire</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/stock/stock_history.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/stock/stock_history.php') ?>">
-                        <i class="submenu-icon fa fa-history"></i>
-                        <span>Historique</span>
+                        <i class="submenu-icon">📋</i>
+                        <span>Factures</span>
                     </a>
                 </div>
             </div>
             <?php endif; ?>
 
-            <?php if (hasPermission($roleUtilisateur, 'consommables')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/consommables/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Consommables">
-                    <i class="nav-icon fa fa-flask"></i>
-                    <span class="nav-text">Consommables</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/consommables/index.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/consommables/index.php') ?>">
-                        <i class="submenu-icon fa fa-list"></i>
-                        <span>Liste Consommables</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/consommables/alertes.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/consommables/alertes.php') ?>">
-                        <i class="submenu-icon fa fa-exclamation-triangle"></i>
-                        <span>Alertes Stock</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'gestion_fournisseurs')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/Fournisseurs/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Fournisseurs">
-                    <i class="nav-icon fa fa-truck-loading"></i>
-                    <span class="nav-text">Fournisseurs</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/Fournisseurs/ajouter.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/Fournisseurs/ajouter.php') ?>">
-                        <i class="submenu-icon fa fa-plus"></i>
-                        <span>Ajouter Fournisseur</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/Fournisseurs/index.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/Fournisseurs/index.php') ?>">
-                        <i class="submenu-icon fa fa-list"></i>
-                        <span>Liste Fournisseurs</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-        </div>
-
-        <!-- Section Services -->
-        <div class="nav-section">
-            <div class="nav-title">Services & Digital</div>
-            
-            <?php if (hasPermission($roleUtilisateur, 'reservation_online')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/reservation_en_ligne/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Réservation en Ligne">
-                    <i class="nav-icon fa fa-calendar-alt"></i>
-                    <span class="nav-text">Réservation</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/reservation_en_ligne/creneaux.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/reservation_en_ligne/creneaux.php') ?>">
-                        <i class="submenu-icon fa fa-clock"></i>
-                        <span>Gestion Créneaux</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/reservation_en_ligne/rdv.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/reservation_en_ligne/rdv.php') ?>">
-                        <i class="submenu-icon fa fa-calendar-check"></i>
-                        <span>Rendez-vous</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'client_portal')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/client_portal/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Portail Client">
-                    <i class="nav-icon fa fa-user-circle"></i>
-                    <span class="nav-text">Portail Client</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/client_portal/index.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/client_portal/index.php') ?>">
-                        <i class="submenu-icon fa fa-home"></i>
-                        <span>Accueil Portail</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/client_portal/suivi_commande.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/client_portal/suivi_commande.php') ?>">
-                        <i class="submenu-icon fa fa-search"></i>
-                        <span>Suivi Commande</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'paiements_online')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/paiements_en_ligne/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Paiements en Ligne">
-                    <i class="nav-icon fa fa-credit-card"></i>
-                    <span class="nav-text">Paiements Online</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/paiements_en_ligne/paiements.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/paiements_en_ligne/paiements.php') ?>">
-                        <i class="submenu-icon fa fa-money-check-alt"></i>
-                        <span>Interface Paiement</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/paiements_en_ligne/mobile_money.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/paiements_en_ligne/mobile_money.php') ?>">
-                        <i class="submenu-icon fa fa-mobile-alt"></i>
-                        <span>Mobile Money</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'livraison')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/livraison/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Livraison">
-                    <i class="nav-icon fa fa-truck"></i>
-                    <span class="nav-text">Livraison</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/livraison/tournees.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/livraison/tournees.php') ?>">
-                        <i class="submenu-icon fa fa-route"></i>
-                        <span>Planning Tournées</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/livraison/suivi_gps.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/livraison/suivi_gps.php') ?>">
-                        <i class="submenu-icon fa fa-map-marker-alt"></i>
-                        <span>Suivi GPS</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'urgences')): ?>
+            <?php if (isset($userPermissions['paiements_online'])): ?>
             <div class="nav-item">
-                <a class="nav-link <?= isActive('pages/urgences/express.php', $relative_uri) ? 'active' : '' ?>" 
-                   href="<?= generateUrl('pages/urgences/express.php') ?>"
-                   data-tooltip="Services Urgences">
-                    <i class="nav-icon fa fa-bolt"></i>
-                    <span class="nav-text">Service Express</span>
-                    <span class="nav-badge">NEW</span>
+                <a class="nav-link <?= isActive('pages/paiements_en_ligne/paiements.php', $relative_uri) ? 'active' : '' ?>" 
+                   href="<?= generateUrl('pages/paiements_en_ligne/paiements.php') ?>"
+                   data-tooltip="Paiements">
+                    <i class="nav-icon">💳</i>
+                    <span class="nav-text">Paiements</span>
                 </a>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'boutique')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/boutique/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Boutique en Ligne">
-                    <i class="nav-icon fa fa-store"></i>
-                    <span class="nav-text">Boutique</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/boutique/index.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/boutique/index.php') ?>">
-                        <i class="submenu-icon fa fa-shopping-bag"></i>
-                        <span>Catalogue Produits</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/boutique/commandes.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/boutique/commandes.php') ?>">
-                        <i class="submenu-icon fa fa-shopping-cart"></i>
-                        <span>Gestion Commandes</span>
-                    </a>
-                </div>
             </div>
             <?php endif; ?>
         </div>
 
-        <!-- Section Marketing -->
-        <div class="nav-section">
-            <div class="nav-title">Marketing & Communication</div>
-            
-            <?php if (hasPermission($roleUtilisateur, 'marketing')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/marketing/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Marketing">
-                    <i class="nav-icon fa fa-bullhorn"></i>
-                    <span class="nav-text">Marketing</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/marketing/emailing.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/marketing/emailing.php') ?>">
-                        <i class="submenu-icon fa fa-envelope"></i>
-                        <span>Campagnes Email</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/marketing/avis_clients.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/marketing/avis_clients.php') ?>">
-                        <i class="submenu-icon fa fa-comment"></i>
-                        <span>Avis Clients</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'notifications')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/notifications/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Notifications">
-                    <i class="nav-icon fa fa-bell"></i>
-                    <span class="nav-text">Notifications</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/notifications/sms.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/notifications/sms.php') ?>">
-                        <i class="submenu-icon fa fa-sms"></i>
-                        <span>Envoi SMS</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/notifications/email_automatiques.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/notifications/email_automatiques.php') ?>">
-                        <i class="submenu-icon fa fa-envelope-open"></i>
-                        <span>Emails Automatiques</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-        </div>
-
-        <!-- Section Administration -->
-        <?php if (hasPermission($roleUtilisateur, 'administration')): ?>
+        <!-- SECTION ADMINISTRATION -->
+        <?php if (isset($userPermissions['administration'])): ?>
         <div class="nav-section">
             <div class="nav-title">Administration</div>
             
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/admin/') === 0 || strpos($relative_uri, 'pages/utilisateurs/') === 0 ? 'open' : '' ?>">
+            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/admin/') === 0 ? 'open' : '' ?>">
                 <a class="nav-link" href="#" data-tooltip="Administration">
-                    <i class="nav-icon fa fa-cogs"></i>
+                    <i class="nav-icon">⚙️</i>
                     <span class="nav-text">Administration</span>
                 </a>
                 <div class="submenu">
+                    <!-- Configuration des activités -->
+                    <a class="submenu-link <?= isActive('pages/admin/configuration/activites.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/admin/configuration/activites.php') ?>">
+                        <i class="submenu-icon">🏢</i>
+                        <span>Activités</span>
+                    </a>
+                    
+                    <!-- Profils utilisateurs spécifiques -->
+                    <a class="submenu-link <?= isActive('pages/admin/profils/index.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/admin/profils/index.php') ?>">
+                        <i class="submenu-icon">👤</i>
+                        <span>Profils Métier</span>
+                    </a>
+                    
+                    <!-- Tarification par activité -->
+                    <a class="submenu-link <?= isActive('pages/admin/tarifs/activites.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/admin/tarifs/activites.php') ?>">
+                        <i class="submenu-icon">💰</i>
+                        <span>Tarifs par Activité</span>
+                    </a>
+                    
+                    <!-- Modèles de factures -->
+                    <a class="submenu-link <?= isActive('pages/admin/factures/modeles.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/admin/factures/modeles.php') ?>">
+                        <i class="submenu-icon">🧾</i>
+                        <span>Modèles Factures</span>
+                    </a>
+                    
+                    <!-- Utilisateurs -->
                     <a class="submenu-link <?= isActive('pages/admin/utilisateurs/index.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/admin/utilisateurs/index.php') ?>">
-                        <i class="submenu-icon fa fa-users"></i>
+                        <i class="submenu-icon">👥</i>
                         <span>Utilisateurs</span>
-                    </a>
-                    <?php if (hasPermission($roleUtilisateur, 'gestion_agences')): ?>
-                    <a class="submenu-link <?= isActive('pages/admin/agences/index.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/admin/agences/index.php') ?>">
-                        <i class="submenu-icon fa fa-building"></i>
-                        <span>Agences</span>
-                    </a>
-                    <?php endif; ?>
-                    <a class="submenu-link <?= isActive('pages/admin/services.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/admin/services.php') ?>">
-                        <i class="submenu-icon fa fa-concierge-bell"></i>
-                        <span>Services</span>
-                    </a>
-                    <?php if (hasPermission($roleUtilisateur, 'audit')): ?>
-                    <a class="submenu-link <?= isActive('pages/admin/audit/view_activity_log.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/admin/audit/view_activity_log.php') ?>">
-                        <i class="submenu-icon fa fa-clipboard-list"></i>
-                        <span>Logs Activité</span>
-                    </a>
-                    <?php endif; ?>
-                    <a class="submenu-link <?= isActive('pages/admin/configuration/backup.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/admin/configuration/backup.php') ?>">
-                        <i class="submenu-icon fa fa-database"></i>
-                        <span>Sauvegarde</span>
                     </a>
                 </div>
             </div>
 
-            <?php if (hasPermission($roleUtilisateur, 'rapports')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/reports/') === 0 || strpos($relative_uri, 'pages/reporting/') === 0 ? 'open' : '' ?>">
+            <?php if (isset($userPermissions['rapports'])): ?>
+            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/reporting/') === 0 ? 'open' : '' ?>">
                 <a class="nav-link" href="#" data-tooltip="Rapports">
-                    <i class="nav-icon fa fa-chart-bar"></i>
+                    <i class="nav-icon">📊</i>
                     <span class="nav-text">Rapports</span>
                 </a>
                 <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/reports/daily.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/reports/daily.php') ?>">
-                        <i class="submenu-icon fa fa-calendar-day"></i>
-                        <span>Journalier</span>
+                    <a class="submenu-link <?= isActive('pages/reporting/par_activite.php', $relative_uri) ? 'active' : '' ?>" 
+                       href="<?= generateUrl('pages/reporting/par_activite.php') ?>">
+                        <i class="submenu-icon">🏢</i>
+                        <span>Par Activité</span>
                     </a>
                     <a class="submenu-link <?= isActive('pages/reporting/balance.php', $relative_uri) ? 'active' : '' ?>" 
                        href="<?= generateUrl('pages/reporting/balance.php') ?>">
-                        <i class="submenu-icon fa fa-balance-scale"></i>
+                        <i class="submenu-icon">⚖️</i>
                         <span>Balance</span>
                     </a>
-                    <a class="submenu-link <?= isActive('pages/reporting/profit_loss.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/reporting/profit_loss.php') ?>">
-                        <i class="submenu-icon fa fa-chart-line"></i>
-                        <span>Profit & Perte</span>
-                    </a>
                 </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'gestion_comptes')): ?>
-            <div class="nav-item nav-dropdown <?= strpos($relative_uri, 'pages/comptes/') === 0 ? 'open' : '' ?>">
-                <a class="nav-link" href="#" data-tooltip="Comptes">
-                    <i class="nav-icon fa fa-wallet"></i>
-                    <span class="nav-text">Comptes</span>
-                </a>
-                <div class="submenu">
-                    <a class="submenu-link <?= isActive('pages/comptes/comptes_gestion.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/comptes/comptes_gestion.php') ?>">
-                        <i class="submenu-icon fa fa-cog"></i>
-                        <span>Gestion Comptes</span>
-                    </a>
-                    <a class="submenu-link <?= isActive('pages/comptes/soldes.php', $relative_uri) ? 'active' : '' ?>" 
-                       href="<?= generateUrl('pages/comptes/soldes.php') ?>">
-                        <i class="submenu-icon fa fa-balance-scale"></i>
-                        <span>Soldes Clients</span>
-                    </a>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'partenariats')): ?>
-            <div class="nav-item">
-                <a class="nav-link <?= isActive('pages/partenariats/index.php', $relative_uri) ? 'active' : '' ?>" 
-                   href="<?= generateUrl('pages/partenariats/index.php') ?>"
-                   data-tooltip="Partenariats">
-                    <i class="nav-icon fa fa-handshake"></i>
-                    <span class="nav-text">Partenariats</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
-            </div>
-            <?php endif; ?>
-
-            <?php if (hasPermission($roleUtilisateur, 'environnement')): ?>
-            <div class="nav-item">
-                <a class="nav-link <?= isActive('pages/environnement/index.php', $relative_uri) ? 'active' : '' ?>" 
-                   href="<?= generateUrl('pages/environnement/index.php') ?>"
-                   data-tooltip="Environnement">
-                    <i class="nav-icon fa fa-leaf"></i>
-                    <span class="nav-text">Environnement</span>
-                    <span class="nav-badge">NEW</span>
-                </a>
             </div>
             <?php endif; ?>
 
@@ -1352,49 +1245,41 @@ if ($estConnecte):
                 <a class="nav-link <?= isActive('pages/settings/index.php', $relative_uri) ? 'active' : '' ?>" 
                    href="<?= generateUrl('pages/settings/index.php') ?>"
                    data-tooltip="Paramètres">
-                    <i class="nav-icon fa fa-sliders-h"></i>
+                   <i class="nav-icon">⚙️</i>
                     <span class="nav-text">Paramètres</span>
                 </a>
             </div>
         </div>
         <?php endif; ?>
 
-        <!-- Section Utilisateur -->
+        <!-- SECTION UTILISATEUR -->
         <div class="nav-section">
             <div class="nav-item">
                 <a class="nav-link <?= isActive('pages/utilisateurs/mon_compte.php', $relative_uri) ? 'active' : '' ?>" 
                    href="<?= generateUrl('pages/utilisateurs/mon_compte.php') ?>"
                    data-tooltip="Mon Compte">
-                    <i class="nav-icon fa fa-user-cog"></i>
+                   <i class="nav-icon">👤</i>
                     <span class="nav-text">Mon Compte</span>
                 </a>
             </div>
-            
-            <div class="nav-item">
-                <a class="nav-link" href="<?= generateUrl('fonctions/deconnexion.php') ?>"
-                   onclick="return confirm('Êtes-vous sûr de vouloir vous déconnecter ?');"
-                   data-tooltip="Déconnexion">
-                    <i class="nav-icon fa fa-sign-out-alt" style="color: #e74c3c;"></i>
-                    <span class="nav-text" style="color: #e74c3c;">Déconnexion</span>
-                </a>
-            </div>
+           
         </div>
     </nav>
     
     <div class="sidebar-footer">
         <div class="user-info">
-            <div class="user-name"><?= htmlspecialchars(($user_info['prenom'] ?? '') . ' ' . ($user_info['nom'] ?? 'Utilisateur')) ?></div>
+            <div class="user-name"><?= htmlspecialchars($user_info['nom_complet'] ?? 'Utilisateur') ?></div>
             <div class="user-role"><?= htmlspecialchars($roleUtilisateur) ?></div>
         </div>
-        
         <div class="sidebar-info">
-            <div class="info-label">Période</div>
-            <div class="info-value"><?= htmlspecialchars($moisEnCours) ?></div>
-        </div>
-        
-        <div class="sidebar-info">
-            <div class="info-label">Version</div>
-            <div class="info-value"><?= htmlspecialchars($version) ?></div>
+            <div class="info-group">
+                <span class="info-label">V.</span>
+                <span class="info-value"><?= htmlspecialchars($version) ?></span>
+            </div>
+            <div class="info-group">
+                <span class="info-label">Pér. :</span>
+                <span class="info-value"><?= htmlspecialchars($moisEnCours) ?></span>
+            </div>
         </div>
     </div>
 </aside>
@@ -1482,50 +1367,15 @@ $(document).ready(function() {
     // Surveiller les changements de taille
     $(window).on('resize', handleResponsive);
     
-    // Animation smooth pour les liens actifs
-    $('.nav-link, .submenu-link').on('click', function() {
-        const href = $(this).attr('href');
-        if (href && href !== '#') {
-            sidebar.addClass('loading');
-            setTimeout(() => {
-                sidebar.removeClass('loading');
-            }, 300);
-        }
-    });
-    
-    // Gestion du hover pour desktop
-    if (!isMobile()) {
-        $('.nav-link').hover(
-            function() {
-                if (sidebar.hasClass('collapsed')) {
-                    $(this).addClass('hover');
-                }
-            },
-            function() {
-                $(this).removeClass('hover');
-            }
-        );
+    // Sélection automatique de l'activité
+    function setActiveActivity() {
+        const activity = '<?= $userActivity ?>';
+        $('.activity-badge').removeClass('activity-all');
+        $('.activity-badge').addClass('activity-' + activity);
     }
     
-    // Empêcher la fermeture du sidebar sur mobile quand on clique à l'intérieur
-    sidebar.on('click', function(e) {
-        if (isMobile()) {
-            e.stopPropagation();
-        }
-    });
-    
-    // Fermer le sidebar mobile en cliquant à l'extérieur
-    $(document).on('click', function(e) {
-        if (isMobile() && !$(e.target).closest('.sidebar').length && !$(e.target).is('#toggleMobile')) {
-            sidebar.removeClass('open');
-        }
-    });
-    
-    // Initialiser les tooltips
-    $('.nav-link[data-tooltip]').each(function() {
-        const tooltip = $(this).attr('data-tooltip');
-        $(this).attr('title', tooltip);
-    });
+    // Initialiser l'activité
+    setActiveActivity();
 });
 </script>
 
@@ -1571,4 +1421,4 @@ restore_error_handler();
 ob_end_flush();
 ?>
 </body>
-</html>
+</html>cd

@@ -230,7 +230,7 @@ require_once  '../../templates/navigation.php';
             <!-- Messages d'alerte -->
             <?php if ($message): ?>
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="fas fa-check-circle me-2"></i>
+                  
                     <?= htmlspecialchars($message) ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
@@ -238,7 +238,7 @@ require_once  '../../templates/navigation.php';
 
             <?php if (!empty($erreurs)): ?>
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Erreurs de validation</h5>
+                    <h5 class="alert-heading">Erreurs de validation</h5>
                     <ul class="mb-0">
                         <?php foreach ($erreurs as $erreur): ?>
                             <li><?= htmlspecialchars($erreur) ?></li>
@@ -294,7 +294,7 @@ require_once  '../../templates/navigation.php';
                             <div class="col-12 col-md-6">
                                 <label for="email" class="form-label">Email</label>
                                 <div class="input-group">
-                                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                    <span class="input-group-text"></span>
                                     <input type="email" class="form-control" id="email" name="email" 
                                            maxlength="100"
                                            value="<?= htmlspecialchars($formData['email'] ?? '') ?>"
@@ -394,7 +394,7 @@ require_once  '../../templates/navigation.php';
                                         <a href="supprimer.php?id=<?= $fournisseur_id ?>" 
                                            class="btn btn-outline-danger"
                                            onclick="return confirm('Êtes-vous sûr de vouloir désactiver ce fournisseur ?')">
-                                            <i class="fas fa-trash-alt me-2"></i> Désactiver
+                                             Désactiver
                                         </a>
                                     </div>
                                 </div>
@@ -436,7 +436,7 @@ require_once  '../../templates/navigation.php';
                     <div class="card h-100 border-start border-success border-4">
                         <div class="card-body">
                             <h5 class="card-title text-success">
-                                <i class="fas fa-boxes me-2"></i>Produits associés
+                               Produits associés
                             </h5>
                             <?php
                             // Récupérer le nombre de produits associés

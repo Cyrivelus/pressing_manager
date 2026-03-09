@@ -23,7 +23,7 @@ $stats = $pdo->query("SELECT
 require_once '../../templates/header.php';
 require_once  '../../templates/navigation.php';
 ?>
-
+<br><br><br>
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -31,7 +31,7 @@ require_once  '../../templates/navigation.php';
             <p class="text-muted">Consultez et gérez l'ensemble de vos transactions commerciales</p>
         </div>
         <a href="creer.php" class="btn btn-primary shadow-sm px-4">
-            <i class="fas fa-plus-circle me-2"></i> Nouvelle Facture
+            + Nouvelle Facture
         </a>
     </div>
 
@@ -74,7 +74,7 @@ require_once  '../../templates/navigation.php';
                         <?php if (empty($factures)): ?>
                             <tr>
                                 <td colspan="6" class="text-center py-5 text-muted">
-                                    <i class="fas fa-folder-open fa-3x mb-3 d-block opacity-25"></i>
+                                 
                                     Aucune facture trouvée dans le système.
                                 </td>
                             </tr>
@@ -101,13 +101,13 @@ require_once  '../../templates/navigation.php';
                                     <td class="text-end pe-4">
                                         <div class="btn-group shadow-sm">
                                             <a href="voir.php?id=<?= $f['id_facture'] ?>" class="btn btn-sm btn-white border" title="Voir">
-                                                <i class="fas fa-eye text-primary"></i>
+                                                Voir
                                             </a>
                                             <a href="imprimer.php?id=<?= $f['id_facture'] ?>" target="_blank" class="btn btn-sm btn-white border" title="Imprimer">
-                                                <i class="fas fa-print"></i>
+                                                Imprimer
                                             </a>
                                             <button type="button" class="btn btn-sm btn-white border text-danger" title="Supprimer" onclick="confirmDelete(<?= $f['id_facture'] ?>)">
-                                                <i class="fas fa-trash-alt"></i>
+                                               Supprimer
                                             </button>
                                         </div>
                                     </td>

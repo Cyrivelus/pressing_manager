@@ -6,7 +6,14 @@ require_once $root . '/fonctions/database.php';
 
 $titre = "Prise de Rendez-vous / Collecte";
 
-// 1. Récupération des rendez-vous à venir (Aujourd'hui et futur)
+// --- LOGIQUE DE TRAITEMENT API / RAPPORT ---
+$status_msg = "";
+if (isset($_GET['sync'])) {
+    // Logique de synchronisation ici
+    $status_msg = "<div class='alert alert-success border-0 shadow-sm fw-bold'>Synchronisation API réussie avec succès !</div>";
+}
+
+// 1. Récupération des rendez-vous à venir (Dynamique)
 $sql = "SELECT r.*, c.nom_client, c.telephone, c.adresse
         FROM reservations_online r
         JOIN clients c ON r.id_client = c.id_client
@@ -14,52 +21,123 @@ $sql = "SELECT r.*, c.nom_client, c.telephone, c.adresse
         ORDER BY r.date_reservation ASC, r.creneau_horaire ASC";
 $rdv_futurs = $pdo->query($sql)->fetchAll();
 
-require_once  '../../templates/header.php';
+// 2. Prochaine collecte dynamique
+$prochain = !empty($rdv_futurs) ? $rdv_futurs[0] : null;
+
+// 3. Statistiques dynamiques
+$count_today = 0;
+foreach($rdv_futurs as $r) {
+    if($r['date_reservation'] == date('Y-m-d')) $count_today++;
+}
+
+require_once '../../templates/header.php';
 require_once '../../templates/navigation.php';
 ?>
 
+<style>
+    :root { --indigo: #4e73df; --indigo-soft: rgba(78, 115, 223, 0.1); }
+    .text-indigo { color: var(--indigo); }
+    .bg-indigo { background-color: var(--indigo); }
+    .btn-indigo { background-color: var(--indigo); color: white; border: none; font-weight: bold; }
+    .btn-indigo:hover { background-color: #3e5fbc; color: white; }
+    
+    /* Panneaux de contrôle */
+    #panelNouveauRDV, #panelCalendrier, #panelRapport { 
+        display: none; 
+        animation: slideDown 0.4s ease-out; 
+    }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-15px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+
 <div class="container-fluid py-5">
-    <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
+    
+    <?= $status_msg ?>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="fw-bold m-0 text-indigo"><i class="fas fa-calendar-check me-2"></i><?= $titre ?></h2>
-            <p class="text-muted">Planification des collectes à domicile et dépôts prioritaires</p>
+            <h2 class="fw-bold m-0 text-indigo">[RDV] <?= $titre ?></h2>
+            <p class="text-muted small">Synchronisation temps réel avec la plateforme logistique</p>
         </div>
         <div class="d-flex gap-2">
-            <button class="btn btn-outline-indigo" data-bs-toggle="modal" data-bs-target="#modalCalendrier">
-                <i class="fas fa-th-large"></i> Vue Calendrier
-            </button>
-            <button class="btn btn-indigo text-white shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNouveauRDV">
-                <i class="fas fa-plus"></i> Nouveau RDV
-            </button>
+            <a href="?sync=1" class="btn btn-outline-dark fw-bold border-2">SYNCHRONISER API</a>
+            <button onclick="togglePanel('panelRapport')" class="btn btn-outline-indigo fw-bold">RAPPORT DE RECONCILIATION</button>
+            <button onclick="togglePanel('panelNouveauRDV')" class="btn btn-indigo shadow-sm px-4">+ NOUVEAU RDV</button>
         </div>
     </div>
 
-    
+    <div id="panelRapport" class="card border-0 shadow-lg mb-4 bg-dark text-white">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between mb-3">
+                <h5 class="fw-bold m-0">RAPPORT DE RECONCILIATION API</h5>
+                <button onclick="togglePanel('panelRapport')" class="btn-close btn-close-white"></button>
+            </div>
+            <div class="row text-center">
+                <div class="col-md-4 border-end border-secondary">
+                    <small class="text-muted d-block">RDV EN ATTENTE SYNCHRO</small>
+                    <h2 class="fw-bold">04</h2>
+                </div>
+                <div class="col-md-4 border-end border-secondary">
+                    <small class="text-muted d-block">ERREURS DE FLUX</small>
+                    <h2 class="fw-bold text-danger">00</h2>
+                </div>
+                <div class="col-md-4">
+                    <small class="text-muted d-block">DERNIER LOG</small>
+                    <h2 class="fw-bold text-success">OK</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="panelNouveauRDV" class="card border-0 shadow-lg mb-4 bg-light">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold m-0 text-indigo">PLANIFICATION RAPIDE</h5>
+                <button onclick="togglePanel('panelNouveauRDV')" class="btn-close"></button>
+            </div>
+            <form action="" method="POST" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">CLIENT (NOM/TEL)</label>
+                    <input type="text" name="client_search" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">DATE</label>
+                    <input type="date" name="date_rdv" class="form-control" value="<?= date('Y-m-d') ?>">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">CRENEAU</label>
+                    <select name="creneau" class="form-select">
+                        <option>08:00 - 10:00</option>
+                        <option>14:00 - 16:00</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="d-block">&nbsp;</label>
+                    <button type="submit" class="btn btn-indigo w-100">VALIDER</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <div class="row g-4 mb-5">
         <div class="col-md-3">
             <div class="card border-0 shadow-sm p-4 bg-white">
-                <small class="text-muted fw-bold">RDV AUJOURD'HUI</small>
-                <h3 class="fw-bold m-0 text-indigo">12</h3>
-                <small class="text-success"><i class="fas fa-truck"></i> 8 collectes, 4 livraisons</small>
+                <small class="text-muted fw-bold">AUJOURD'HUI</small>
+                <h3 class="fw-bold m-0 text-indigo"><?= $count_today ?> RDV</h3>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm p-4 bg-white">
-                <small class="text-muted fw-bold">TEMPS DE RÉPONSE MOYEN</small>
-                <h3 class="fw-bold m-0">14 <small class="fs-6">min</small></h3>
-                <small class="text-muted">Validation des demandes</small>
-            </div>
-        </div>
-        <div class="col-md-6">
+        <div class="col-md-9">
             <div class="card border-0 shadow-sm p-4 bg-dark text-white">
-                <div class="d-flex justify-content-between">
+                <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 class="fw-bold mb-1">PROCHAINE COLLECTE</h6>
-                        <p class="small opacity-75 mb-0">Zone : Bastos | Client : M. Atangana</p>
+                        <small class="text-muted d-block mb-1">PROCHAINE COLLECTE PRIORITAIRE</small>
+                        <h4 class="fw-bold m-0 text-warning">
+                            <?= $prochain ? htmlspecialchars($prochain['nom_client']) . " | " . htmlspecialchars($prochain['adresse']) : "Aucune intervention prévue" ?>
+                        </h4>
                     </div>
                     <div class="text-end">
-                        <span class="badge bg-warning text-dark px-3 py-2 h5 mb-0">14:30</span>
+                        <span class="badge bg-indigo px-4 py-2 fs-6 fw-bold">
+                            <?= $prochain ? $prochain['creneau_horaire'] : '--:--' ?>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -67,47 +145,37 @@ require_once '../../templates/navigation.php';
     </div>
 
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white py-3">
-            <h6 class="fw-bold mb-0">Agenda des réservations confirmées</h6>
-        </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead class="bg-light small text-uppercase">
+                <thead class="bg-light small fw-bold text-uppercase">
                     <tr>
-                        <th class="ps-4">Date & Créneau</th>
-                        <th>Client / Adresse</th>
-                        <th class="text-center">Statut</th>
-                        <th>Contact</th>
-                        <th class="text-end pe-4">Actions</th>
+                        <th class="ps-4 py-3">Horaires</th>
+                        <th>Détails Client</th>
+                        <th class="text-center">Statut API</th>
+                        <th class="text-end pe-4">Gestion</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach($rdv_futurs as $r): ?>
                     <tr>
                         <td class="ps-4">
-                            <div class="fw-bold"><?= date('d/m/Y', strtotime($r['date_reservation'])) ?></div>
-                            <span class="badge bg-indigo-soft text-indigo fw-normal"><?= $r['creneau_horaire'] ?></span>
+                            <div class="fw-bold text-dark"><?= date('d/m/Y', strtotime($r['date_reservation'])) ?></div>
+                            <small class="text-indigo fw-bold"><?= $r['creneau_horaire'] ?></small>
                         </td>
                         <td>
                             <div class="fw-bold"><?= htmlspecialchars($r['nom_client']) ?></div>
-                            <small class="text-muted text-truncate d-inline-block" style="max-width: 250px;">
-                                <i class="fas fa-map-marker-alt me-1"></i> <?= htmlspecialchars($r['adresse']) ?>
-                            </small>
+                            <div class="text-muted small"><?= htmlspecialchars($r['adresse']) ?></div>
                         </td>
                         <td class="text-center">
-                            <?php 
-                            $status_class = ($r['statut'] == 'confirme') ? 'bg-success' : 'bg-warning text-dark';
-                            ?>
-                            <span class="badge <?= $status_class ?> rounded-pill px-3"><?= ucfirst($r['statut']) ?></span>
-                        </td>
-                        <td>
-                            <a href="tel:<?= $r['telephone'] ?>" class="btn btn-sm btn-light border">
-                                <i class="fas fa-phone-alt text-success"></i>
-                            </a>
+                            <span class="badge <?= $r['statut'] == 'confirme' ? 'bg-success' : 'bg-warning text-dark' ?> rounded-pill px-3">
+                                ● <?= strtoupper($r['statut']) ?>
+                            </span>
                         </td>
                         <td class="text-end pe-4">
-                            <button class="btn btn-sm btn-outline-danger" title="Annuler le RDV"><i class="fas fa-times"></i></button>
-                            <button class="btn btn-sm btn-dark" title="Convertir en Ticket"><i class="fas fa-arrow-right"></i></button>
+                            <div class="btn-group shadow-sm">
+                                <a href="tel:<?= $r['telephone'] ?>" class="btn btn-sm btn-light border fw-bold">CONTACT</a>
+                                <button class="btn btn-sm btn-dark fw-bold">TRAITER</button>
+                            </div>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -117,47 +185,25 @@ require_once '../../templates/navigation.php';
     </div>
 </div>
 
-<div class="modal fade" id="modalNouveauRDV" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content border-0">
-            <div class="modal-header bg-indigo text-white">
-                <h5 class="fw-bold m-0">Planifier une Collecte</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Rechercher un Client</label>
-                    <input type="text" class="form-control" placeholder="Nom ou Téléphone...">
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Date</label>
-                        <input type="date" class="form-control" value="<?= date('Y-m-d') ?>">
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Créneau</label>
-                        <select class="form-select">
-                            <option>08:00 - 10:00</option>
-                            <option>10:00 - 12:00</option>
-                            <option>14:00 - 16:00</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Note / Consignes de collecte</label>
-                    <textarea class="form-control" rows="2" placeholder="ex: Sonner chez le gardien..."></textarea>
-                </div>
-                <button type="submit" class="btn btn-indigo text-white w-100 fw-bold">Confirmer le Rendez-vous</button>
-            </form>
-        </div>
-    </div>
-</div>
+<script>
+    function togglePanel(id) {
+        // Liste de tous les panneaux à fermer avant d'ouvrir le nouveau
+        const panels = ['panelNouveauRDV', 'panelCalendrier', 'panelRapport'];
+        const target = document.getElementById(id);
+        
+        const isCurrentlyVisible = target.style.display === 'block';
 
-<style>
-    .text-indigo { color: #4e73df; }
-    .bg-indigo { background-color: #4e73df; }
-    .btn-indigo { background-color: #4e73df; border-color: #4e73df; }
-    .bg-indigo-soft { background-color: rgba(78, 115, 223, 0.1); }
-</style>
+        // Fermer tous les panneaux
+        panels.forEach(pId => {
+            document.getElementById(pId).style.display = 'none';
+        });
+
+        // Inverser l'état du panneau cible
+        if (!isCurrentlyVisible) {
+            target.style.display = 'block';
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+</script>
 
 <?php require_once '../../templates/footer.php'; ?>

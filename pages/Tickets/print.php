@@ -5,9 +5,9 @@ require_once '../../fonctions/database.php';
 $id_ticket = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 try {
-    // Requête conforme à votre structure de tables
+    // Requête corrigée selon votre structure de table réelle
     $query = "SELECT t.*, c.nom_client, c.prenom_client, c.telephone as client_tel,
-                     a.nom_agence, a.adresse as agence_adresse, a.telephone as agence_tel,
+                     a.nom_agence, a.adresse as agence_adresse, a.telephone as agence_tel, a.email as agence_email,
                      u.nom_complet as caissier
               FROM tickets t
               LEFT JOIN clients c ON t.id_client = c.id_client
@@ -20,6 +20,7 @@ try {
 
     if (!$ticket) die("Ticket introuvable.");
 
+    // Récupération des lignes (Services ou Produits)
     $stmt_lignes = $pdo->prepare("SELECT l.*, s.nom_service 
                                   FROM lignes_ticket l 
                                   JOIN services s ON l.id_service = s.id_service 
@@ -28,7 +29,7 @@ try {
     $lignes = $stmt_lignes->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (Exception $e) {
-    die("Erreur : " . $e->getMessage());
+    die("Erreur technique : " . $e->getMessage());
 }
 ?>
 
@@ -36,153 +37,142 @@ try {
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Ticket #<?= $ticket['numero_ticket'] ?></title>
+    <title>Ticket_<?= $ticket['numero_ticket'] ?></title>
     <style>
-        /* Configuration de la page pour rouleau thermique standard */
+        /* Style Thermique Professionnel */
         @page { margin: 0; }
         body { 
-            font-family: 'Courier New', Courier, monospace; 
-            font-size: 12px; 
-            line-height: 1.2; 
-            margin: 0; 
-            padding: 2mm; 
-            width: 72mm; /* Largeur de sécurité pour rouleau 80mm */
+            font-family: 'Courier New', monospace; 
+            font-size: 11px; 
+            width: 72mm; /* Standard 80mm moins marges */
+            margin: 0 auto; 
+            padding: 5mm 2mm;
             color: #000;
+            background: #fff;
         }
 
-        .text-center { text-align: center; }
-        .text-right { text-align: right; }
-        .bold { font-weight: bold; }
-        .divider { border-top: 1px dashed #000; margin: 5px 0; }
-        
-        .header h2 { margin: 0; font-size: 16px; text-transform: uppercase; }
-        .header p { margin: 1px 0; font-size: 10px; }
-
-        .ticket-info { margin: 8px 0; font-size: 11px; }
-        .retrait-box { 
-            border: 1px solid #000; 
-            padding: 4px; 
-            margin: 5px 0; 
-            text-align: center; 
-            font-size: 14px;
-            background-color: #f0f0f0; /* Visible même sur thermique */
-        }
-
-        table { width: 100%; border-collapse: collapse; margin: 5px 0; }
-        th { border-bottom: 1px solid #000; text-align: left; font-size: 11px; padding-bottom: 2px; }
-        td { padding: 3px 0; vertical-align: top; font-size: 11px; }
-
-        .totals { margin-top: 5px; }
-        .totals div { margin-bottom: 2px; }
-        .net-a-payer { 
-            font-size: 15px; 
-            margin: 4px 0; 
-            padding: 2px 0;
-            border-top: 1px solid #000;
-            border-bottom: 1px solid #000; 
+        .no-print { 
+            background: #333; padding: 10px; text-align: center; margin-bottom: 20px; 
+            border-radius: 4px;
         }
         
-        .footer { margin-top: 15px; font-size: 9px; line-height: 1.3; }
-        .barcode { 
-            margin-top: 10px; 
-            font-size: 16px; 
-            letter-spacing: 5px; 
-            font-weight: bold;
+        .header { text-align: center; margin-bottom: 10px; }
+        .header h2 { margin: 0 0 5px 0; font-size: 15px; border-bottom: 1px double #000; display: inline-block; }
+        .header p { margin: 2px 0; font-size: 10px; }
+
+        .info-section { margin: 10px 0; font-size: 11px; }
+        .info-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+        
+        .type-badge { 
+            border: 1px solid #000; padding: 5px; text-align: center; 
+            font-weight: bold; margin: 10px 0; font-size: 13px;
+            text-transform: uppercase;
         }
 
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th { border-bottom: 1px dashed #000; text-align: left; padding: 5px 0; font-size: 10px; }
+        td { padding: 5px 0; vertical-align: top; }
+
+        .totals { border-top: 1px solid #000; padding-top: 5px; }
+        .total-row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+        .grand-total { font-size: 14px; font-weight: bold; border-top: 1px double #000; padding-top: 5px; margin-top: 5px; }
+
+        .footer { text-align: center; margin-top: 15px; font-size: 9px; }
+        .barcode { font-family: 'Libre Barcode 39', cursive; font-size: 30px; margin: 10px 0; }
+        
         @media print {
-            .no-print { display: none; }
-            body { width: 97%; } /* Laisse l'imprimante gérer la découpe */
+            .no-print { display: none !important; }
+            body { width: 100%; padding: 0; margin: 0; }
         }
     </style>
 </head>
-<body onload="window.print();">
+<body onload="window.print()">
 
-    <div class="no-print" style="background: #444; padding: 15px; text-align:center; color: white; font-family: sans-serif;">
-        <button onclick="window.print();" style="padding: 10px 20px; font-weight:bold; cursor:pointer; background: #28a745; color:white; border:none; border-radius:5px;">🖨️ IMPRIMER LE TICKET</button>
-        <button onclick="window.history.back();" style="padding: 10px 20px; cursor:pointer; background: #dc3545; color:white; border:none; border-radius:5px; margin-left:10px;">RETOUR</button>
+    <div class="no-print">
+        <button onclick="window.print()" style="cursor:pointer; padding: 8px 15px; background: #28a745; color: white; border:none; border-radius:3px;">Imprimer</button>
+        <button onclick="window.history.back()" style="cursor:pointer; padding: 8px 15px; background: #666; color: white; border:none; border-radius:3px;">Retour</button>
     </div>
 
-    <div class="header text-center">
-        <h2><?= htmlspecialchars($ticket['nom_agence']) ?></h2>
+    <div class="header">
+        <h2><?= strtoupper(htmlspecialchars($ticket['nom_agence'])) ?></h2>
         <p><?= htmlspecialchars($ticket['agence_adresse']) ?></p>
         <p>Tél: <?= htmlspecialchars($ticket['agence_tel']) ?></p>
+        <?php if($ticket['agence_email']): ?><p><?= $ticket['agence_email'] ?></p><?php endif; ?>
     </div>
 
-    <div class="divider"></div>
-
-    <div class="ticket-info">
-        <div class="bold">TICKET : #<?= $ticket['numero_ticket'] ?></div>
-         
-        <div>Client : <?= strtoupper(htmlspecialchars($ticket['nom_client'])) ?> <?= htmlspecialchars($ticket['prenom_client']) ?></div>
-       
-        <div> NIU : </div>
-        <div> RC : </div>
-        <div> Bienvenu à </div>
-        <div class="retrait-box bold">
-            PRÊT LE : <?= date('d/m/Y', strtotime($ticket['date_retrait_prevue'])) ?>
-        </div>
+    <div class="info-section">
+        <div class="info-row"><span>Ticket No:</span> <strong>#<?= $ticket['numero_ticket'] ?></strong></div>
+        <div class="info-row"><span>Date:</span> <span><?= date('d/m/Y H:i', strtotime($ticket['date_depot'])) ?></span></div>
+        <div class="info-row"><span>Client:</span> <span><?= strtoupper($ticket['nom_client']) ?></span></div>
+        <div class="info-row"><span>Caissier:</span> <span><?= $ticket['caissier'] ?></span></div>
     </div>
 
-    <div class="divider"></div>
+    <?php if (!empty($ticket['date_retrait_prevue'])): ?>
+   <?php 
+// On définit explicitement que seul le pressing (ou une session vide par défaut) affiche la date
+$activite = $_SESSION['user_activity'] ?? 'pressing'; 
+
+if ($activite === 'pressing'): 
+?>
+    <div class="type-badge" style="background: #f1f5f9; padding: 10px; border-radius: 4px; border-left: 4px solid #2563eb; margin-bottom: 15px;">
+        <small style="color: #64748b; font-weight: bold; font-size: 0.7rem;">SORTIE PRÉVUE LE :</small><br>
+        <strong style="color: #1e293b;">
+            <?= isset($ticket['date_retrait_prevue']) ? date('d/m/Y', strtotime($ticket['date_retrait_prevue'])) : 'Non définie' ?>
+        </strong>
+    </div>
+<?php endif; ?>
+    <?php endif; ?>
 
     <table>
         <thead>
             <tr>
                 <th>Désignation</th>
-                <th class="text-right">Qté</th>
-                <th class="text-right">Total</th>
+                <th style="text-align:center">Qté</th>
+                <th style="text-align:right">Total</th>
             </tr>
         </thead>
         <tbody>
             <?php foreach ($lignes as $l): ?>
             <tr>
                 <td><?= htmlspecialchars($l['nom_service']) ?></td>
-                <td class="text-right"><?= (int)$l['quantite'] ?></td>
-                <td class="text-right"><?= number_format($l['sous_total'], 0, ',', ' ') ?></td>
+                <td style="text-align:center"><?= (int)$l['quantite'] ?></td>
+                <td style="text-align:right"><?= number_format($l['sous_total'], 0, ',', ' ') ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
 
-    <div class="divider"></div>
-
     <div class="totals">
-        <div class="text-right">Total Brut : <?= number_format($ticket['montant_total'] + $ticket['montant_remise'], 0, ',', ' ') ?></div>
-        
         <?php if($ticket['montant_remise'] > 0): ?>
-            <div class="text-right">Remise : -<?= number_format($ticket['montant_remise'], 0, ',', ' ') ?></div>
+            <div class="total-row"><span>Total Brut:</span> <span><?= number_format($ticket['montant_total'] + $ticket['montant_remise'], 0, ',', ' ') ?></span></div>
+            <div class="total-row"><span>Remise:</span> <span>-<?= number_format($ticket['montant_remise'], 0, ',', ' ') ?></span></div>
         <?php endif; ?>
 
-        <div class="text-right bold net-a-payer">NET À PAYER : <?= number_format($ticket['montant_total'], 0, ',', ' ') ?></div>
-        
-        <div class="text-right">Versé : <?= number_format($ticket['montant_verse'], 0, ',', ' ') ?></div>
-        
-        <?php 
-        $reste = $ticket['montant_total'] - $ticket['montant_verse'];
-        if ($reste > 0): ?>
-            <div class="text-right bold">RESTE À PAYER : <?= number_format($reste, 0, ',', ' ') ?></div>
-        <?php else: ?>
-            <div class="text-right bold">SOLDE : PAYÉ</div>
-        <?php endif; ?>
+        <div class="total-row grand-total">
+            <span>NET À PAYER:</span>
+            <span><?= number_format($ticket['montant_total'], 0, ',', ' ') ?></span>
+        </div>
+
+        <div class="total-row" style="margin-top:5px;">
+            <span>Acompte Versé:</span>
+            <span><?= number_format($ticket['montant_verse'], 0, ',', ' ') ?></span>
+        </div>
+
+        <?php $reste = $ticket['montant_total'] - $ticket['montant_verse']; ?>
+        <div class="total-row" style="font-weight:bold;">
+            <span><?= $reste > 0 ? 'RESTE À PAYER:' : 'SOLDE:' ?></span>
+            <span><?= $reste > 0 ? number_format($reste, 0, ',', ' ') : 'PAYÉ' ?></span>
+        </div>
     </div>
 
-    <div class="footer text-center">
-        <div class="divider"></div>
-        <p>Encaissé par : <?= htmlspecialchars($ticket['caissier']) ?></p> 
-        <p class="bold">CONDITIONS GÉNÉRALES</p>
-        <p>1. Ce ticket est obligatoire pour le retrait.<br>
-           2. Délai de garde maximum : 3 mois.<br>
-           3. Responsabilité limitée selon les tarifs en vigueur.</p>
-           
-  <div class="ticket-meta" style="display: flex; align-items: center; gap: 15px; margin-top: 5px;">
-    <span><strong></strong> <?= date('d/m/Y H:i', strtotime($ticket['date_depot'])) ?></span>
-    <div class="barcode" style="border: 1px solid #000; padding: 2px 5px; font-family: 'Libre Barcode 39', cursive; font-size: 25px;">
-        <?= htmlspecialchars($ticket['numero_ticket']) ?>
-    </div>
-</div>
-        <p>Merci de votre confiance !</p>
-        <div>TEL : <?= htmlspecialchars($ticket['client_tel'] ?? 'N/A') ?></div>
+    <div class="footer">
+        <p>*** Merci de votre confiance ***</p>
+        <p>Les articles non retirés après 3 mois<br>seront considérés comme abandonnés.</p>
+        
+        <div class="barcode">
+            *<?= $ticket['numero_ticket'] ?>*
+        </div>
+        <p><?= date('d/m/Y H:i:s') ?></p>
     </div>
 
 </body>

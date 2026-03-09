@@ -1,0 +1,132 @@
+<?php
+if (session_status() === PHP_SESSION_NONE) session_start();
+
+// 1. Sécurité
+if (!isset($_SESSION['utilisateur_id'])) {
+    header('Location: ../../index.php');
+    exit;
+}
+
+$root = realpath(__DIR__ . '/../../');
+require_once $root . '/fonctions/database.php';
+$pdo = getConnection();
+
+$id_produit = isset($_GET['id']) ? intval($_GET['id']) : null;
+$message = "";
+
+if (!$id_produit) {
+    header('Location: gestion_consommables.php');
+    exit;
+}
+
+// 2. Traitement du formulaire
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $nouveau_stock = floatval($_POST['nouveau_stock']);
+    $notes = htmlspecialchars($_POST['notes']);
+    $id_user = $_SESSION['utilisateur_id'];
+
+    try {
+        $pdo->beginTransaction();
+
+        // A. Récupérer le stock avant pour calculer la différence
+        $stmt = $pdo->prepare("SELECT stock_actuel FROM consommables WHERE id_consommable = ?");
+        $stmt->execute([$id_produit]);
+        $ancien_stock = $stmt->fetchColumn();
+
+        $difference = $nouveau_stock - $ancien_stock;
+        $type_mouvement = 'ajustement';
+
+        // B. Mettre à jour la table consommables
+        $update = $pdo->prepare("UPDATE consommables SET stock_actuel = ?, date_mise_a_jour = NOW() WHERE id_consommable = ?");
+        $update->execute([$nouveau_stock, $id_produit]);
+
+        // C. Insérer dans la table mouvements_stock (selon votre structure fournie)
+        $log = $pdo->prepare("INSERT INTO mouvements_stock 
+            (id_produit, type_mouvement, quantite, date_mouvement, id_utilisateur, notes, quantite_apres, reference) 
+            VALUES (?, ?, ?, NOW(), ?, ?, ?, ?)");
+        
+        $log->execute([
+            $id_produit, 
+            $type_mouvement, 
+            $difference, // La quantité ajustée (positive ou négative)
+            $id_user, 
+            $notes, 
+            $nouveau_stock, // Quantité après
+            'ADJ-' . time() // Référence unique générée
+        ]);
+
+        $pdo->commit();
+        $message = "<div class='alert alert-success'>Stock mis à jour avec succès !</div>";
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        $message = "<div class='alert alert-danger'>Erreur : " . $e->getMessage() . "</div>";
+    }
+}
+
+// 3. Récupération des infos du produit pour l'affichage
+$stmt = $pdo->prepare("SELECT * FROM consommables WHERE id_consommable = ?");
+$stmt->execute([$id_produit]);
+$produit = $stmt->fetch();
+
+$titre = "Ajustement de Stock";
+require_once $root . '/templates/header.php';
+require_once $root . '/templates/navigation.php';
+?>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="gestion_consommables.php">Stocks</a></li>
+                    <li class="breadcrumb-item active">Ajustement</li>
+                </ol>
+            </nav>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-sync-alt me-2 text-primary"></i>Ajuster le stock</h5>
+                </div>
+                <div class="card-body">
+                    <?= $message ?>
+
+                    <div class="alert alert-info border-0">
+                        <small class="d-block text-uppercase fw-bold">Article :</small>
+                        <span class="h5"><?= htmlspecialchars($produit['nom_article']) ?></span>
+                        <hr>
+                        <div class="d-flex justify-content-between">
+                            <span>Stock actuel :</span>
+                            <span class="badge bg-dark fs-6"><?= $produit['stock_actuel'] ?> <?= $produit['unite_mesure'] ?></span>
+                        </div>
+                    </div>
+
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Nouveau stock réel constaté</label>
+                            <div class="input-group">
+                                <input type="number" step="0.01" name="nouveau_stock" class="form-control form-control-lg" 
+                                       value="<?= $produit['stock_actuel'] ?>" required>
+                                <span class="input-group-text"><?= $produit['unite_mesure'] ?></span>
+                            </div>
+                            <div class="form-text">Saisissez la quantité physique réellement présente en rayon.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Raison de l'ajustement (Notes)</label>
+                            <textarea name="notes" class="form-control" rows="3" placeholder="Ex: Inventaire tournant, perte, erreur de saisie..." required></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>Enregistrer l'ajustement
+                            </button>
+                            <a href="gestion_consommables.php" class="btn btn-light border">Annuler</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php require_once $root . '/templates/footer.php'; ?>
